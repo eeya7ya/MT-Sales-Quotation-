@@ -1,239 +1,638 @@
-const express = require('express');
-const multer = require('multer');
-const xlsx = require('xlsx');
-const path = require('path');
-const fs = require('fs');
-const cors = require('cors');
+'use strict';
 
-const app = express();
+const express = require('express');
+const multer  = require('multer');
+const xlsx    = require('xlsx');
+const path    = require('path');
+const fs      = require('fs');
+const cors    = require('cors');
+const crypto  = require('crypto');
+
+const app  = express();
 const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Multer config for Excel uploads (memory storage — works on read-only serverless filesystems)
+// ─── Multer ───────────────────────────────────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'application/octet-stream'
-    ];
-    if (allowed.includes(file.mimetype) || file.originalname.match(/\.(xlsx|xls)$/i)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only Excel files (.xlsx, .xls) are allowed'));
-    }
+  fileFilter: (_, file, cb) => {
+    const ok = file.originalname.match(/\.(xlsx|xls)$/i) ||
+      ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+       'application/vnd.ms-excel', 'application/octet-stream'].includes(file.mimetype);
+    cb(ok ? null : new Error('Only Excel files (.xlsx/.xls) are allowed'), ok);
   }
 });
 
-const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
-let products = [];
+// ─── PostgreSQL / Neon ────────────────────────────────────────
+let pool  = null;
+let useDB = false;
 
-function loadProducts() {
+(function initPool() {
+  const cs = process.env.POSTGRES_URL || process.env.DATABASE_URL ||
+             process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL_NO_SSL;
+  if (!cs) { console.log('ℹ No DB env – using JSON fallback'); return; }
   try {
-    const data = fs.readFileSync(PRODUCTS_FILE, 'utf8');
-    products = JSON.parse(data);
-    console.log(`✓ Loaded ${products.length} products from database`);
-  } catch (err) {
-    console.error('⚠ Could not load products.json:', err.message);
-    products = [];
+    const { Pool } = require('pg');
+    pool  = new Pool({ connectionString: cs, ssl: { rejectUnauthorized: false } });
+    useDB = true;
+    console.log('✓ PostgreSQL pool created');
+  } catch (e) {
+    console.error('⚠ pg module error:', e.message);
+  }
+})();
+
+async function initDB() {
+  if (!pool) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id            SERIAL PRIMARY KEY,
+        category      VARCHAR(150),
+        system        VARCHAR(150),
+        brand         VARCHAR(150),
+        type          VARCHAR(150),
+        series        VARCHAR(200),
+        model         VARCHAR(300) NOT NULL,
+        description   TEXT,
+        specifications TEXT,
+        dpp_price     NUMERIC(12,3) DEFAULT 0,
+        si_price      NUMERIC(12,3) DEFAULT 0,
+        enduser_price NUMERIC(12,3) DEFAULT 0,
+        created_at    TIMESTAMP DEFAULT NOW(),
+        updated_at    TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    const { rows } = await pool.query('SELECT COUNT(*) FROM products');
+    const count = parseInt(rows[0].count);
+    if (count === 0) await seedFromJSON();
+    else console.log(`✓ PostgreSQL (Neon) ready – ${count} products`);
+  } catch (e) {
+    console.error('⚠ DB init error:', e.message);
+    useDB = false;
   }
 }
-loadProducts();
 
-// ─── API Routes ────────────────────────────────────────────────────────────────
+async function seedFromJSON() {
+  const f = path.join(__dirname, 'data', 'products.json');
+  if (!fs.existsSync(f)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(f, 'utf8'));
+    await dbInsertBulk(data);
+    console.log(`✓ Seeded ${data.length} products into PostgreSQL`);
+  } catch (e) {
+    console.warn('⚠ Seed warning:', e.message);
+  }
+}
 
-// GET all products
-app.get('/api/products', (req, res) => res.json(products));
+async function dbInsertBulk(products) {
+  if (!pool || !products.length) return;
+  const CHUNK = 200;
+  for (let i = 0; i < products.length; i += CHUNK) {
+    const chunk = products.slice(i, i + CHUNK);
+    const vals = [], params = [];
+    let n = 1;
+    for (const p of chunk) {
+      vals.push(`($${n},$${n+1},$${n+2},$${n+3},$${n+4},$${n+5},$${n+6},$${n+7},$${n+8},$${n+9},$${n+10})`);
+      n += 11;
+      params.push(
+        p.category||'General', p.system||'', p.brand||'', p.type||'', p.series||'',
+        p.model||'', p.description||'', p.specifications||'',
+        +p.dpp_price||0, +p.si_price||0, +p.enduser_price||0
+      );
+    }
+    await pool.query(
+      `INSERT INTO products (category,system,brand,type,series,model,description,specifications,dpp_price,si_price,enduser_price) VALUES ${vals.join(',')}`,
+      params
+    );
+  }
+}
 
-// GET cascading filter data
-app.get('/api/filter', (req, res) => {
-  const { category, system, brand, type, series } = req.query;
-  let filtered = [...products];
+// ─── In-memory cache + JSON fallback ──────────────────────────
+const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
+let productsCache = [];
 
-  if (category) filtered = filtered.filter(p => p.category === category);
-  if (system)   filtered = filtered.filter(p => p.system   === system);
-  if (brand)    filtered = filtered.filter(p => p.brand    === brand);
-  if (type)     filtered = filtered.filter(p => p.type     === type);
-  if (series)   filtered = filtered.filter(p => p.series   === series);
+async function loadProducts() {
+  if (useDB && pool) {
+    try {
+      const { rows } = await pool.query(
+        'SELECT * FROM products ORDER BY category,system,brand,type,series,model'
+      );
+      productsCache = rows.map(r => ({
+        ...r,
+        dpp_price:     parseFloat(r.dpp_price)     || 0,
+        si_price:      parseFloat(r.si_price)      || 0,
+        enduser_price: parseFloat(r.enduser_price) || 0
+      }));
+      return;
+    } catch (e) { console.error('⚠ DB load error:', e.message); }
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(PRODUCTS_FILE, 'utf8'));
+    productsCache = data.map((p, i) => ({ id: i + 1, ...p }));
+  } catch (_) { productsCache = []; }
+}
 
-  const unique = (key) => [...new Set(filtered.map(p => p[key]).filter(Boolean))].sort();
+function saveJSON() {
+  try {
+    // eslint-disable-next-line no-unused-vars
+    const data = productsCache.map(({ id, created_at, updated_at, ...rest }) => rest);
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(data, null, 2));
+  } catch (_) {}
+}
 
+// ─── Admin Auth ───────────────────────────────────────────────
+const sessions = new Set();
+
+function adminAuth(req, res, next) {
+  const tok = (req.headers.authorization || '').replace('Bearer ', '');
+  if (sessions.has(tok)) return next();
+  res.status(401).json({ error: 'Unauthorized – admin login required' });
+}
+
+// ─── Admin Routes ──────────────────────────────────────────────
+
+app.post('/api/admin/login', (req, res) => {
+  if (req.body.password === ADMIN_PASSWORD) {
+    const tok = crypto.randomBytes(32).toString('hex');
+    sessions.add(tok);
+    res.json({ success: true, token: tok });
+  } else {
+    res.status(401).json({ error: 'Wrong password' });
+  }
+});
+
+app.post('/api/admin/logout', adminAuth, (req, res) => {
+  sessions.delete((req.headers.authorization || '').replace('Bearer ', ''));
+  res.json({ success: true });
+});
+
+app.get('/api/admin/stats', adminAuth, async (req, res) => {
+  await loadProducts();
+  const uniq = k => [...new Set(productsCache.map(p => p[k]).filter(Boolean))];
   res.json({
-    categories: unique('category'),
-    systems:    unique('system'),
-    brands:     unique('brand'),
-    types:      unique('type'),
-    series:     unique('series'),
-    models: filtered.map(p => ({
-      model:          p.model,
-      description:    p.description,
+    total:        productsCache.length,
+    categories:   uniq('category').length,
+    brands:       uniq('brand').length,
+    categoryList: uniq('category').sort(),
+    brandList:    uniq('brand').sort(),
+    dbType:       useDB ? 'PostgreSQL (Neon)' : 'JSON File'
+  });
+});
+
+// ─── Products (public read) ────────────────────────────────────
+
+app.get('/api/products', async (req, res) => {
+  await loadProducts();
+  res.json(productsCache);
+});
+
+app.get('/api/filter', async (req, res) => {
+  await loadProducts();
+  const { category, system, brand, type, series } = req.query;
+  let f = [...productsCache];
+  if (category) f = f.filter(p => p.category === category);
+  if (system)   f = f.filter(p => p.system   === system);
+  if (brand)    f = f.filter(p => p.brand    === brand);
+  if (type)     f = f.filter(p => p.type     === type);
+  if (series)   f = f.filter(p => p.series   === series);
+  const uniq = k => [...new Set(f.map(p => p[k]).filter(Boolean))].sort();
+  res.json({
+    categories: uniq('category'), systems: uniq('system'),
+    brands: uniq('brand'),        types:   uniq('type'),
+    series: uniq('series'),
+    models: f.map(p => ({
+      id: p.id, model: p.model, description: p.description,
       specifications: p.specifications,
-      dpp_price:      p.dpp_price,
-      si_price:       p.si_price,
-      enduser_price:  p.enduser_price,
-      brand:          p.brand,
-      type:           p.type,
-      series:         p.series,
-      category:       p.category,
-      system:         p.system
+      dpp_price: p.dpp_price, si_price: p.si_price, enduser_price: p.enduser_price,
+      brand: p.brand, type: p.type, series: p.series, category: p.category, system: p.system
     }))
   });
 });
 
-// GET single product by model
-app.get('/api/product', (req, res) => {
-  const { model } = req.query;
-  const product = products.find(p => p.model === model);
-  if (!product) return res.status(404).json({ error: 'Product not found' });
-  res.json(product);
+app.get('/api/product', async (req, res) => {
+  await loadProducts();
+  const p = productsCache.find(x => x.model === req.query.model);
+  if (!p) return res.status(404).json({ error: 'Not found' });
+  res.json(p);
 });
 
-// POST upload Excel and convert to JSON
-app.post('/api/upload', upload.single('excel'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+// ─── Products CRUD (admin only) ────────────────────────────────
 
+app.post('/api/products', adminAuth, async (req, res) => {
+  const p = req.body;
+  if (!p.model) return res.status(400).json({ error: 'model is required' });
   try {
-    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const newProducts = convertExcelToProducts(workbook);
+    if (useDB && pool) {
+      const { rows } = await pool.query(
+        `INSERT INTO products (category,system,brand,type,series,model,description,specifications,dpp_price,si_price,enduser_price)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+        [p.category||'General', p.system||'', p.brand||'', p.type||'', p.series||'',
+         p.model, p.description||'', p.specifications||'',
+         +p.dpp_price||0, +p.si_price||0, +p.enduser_price||0]
+      );
+      await loadProducts();
+      res.json({ success: true, product: rows[0] });
+    } else {
+      const np = {
+        id: (productsCache.length + 1),
+        category: p.category||'General', system: p.system||'', brand: p.brand||'',
+        type: p.type||'', series: p.series||'', model: p.model,
+        description: p.description||'', specifications: p.specifications||'',
+        dpp_price: +p.dpp_price||0, si_price: +p.si_price||0, enduser_price: +p.enduser_price||0
+      };
+      productsCache.push(np);
+      saveJSON();
+      res.json({ success: true, product: np });
+    }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    if (newProducts.length === 0) {
+app.put('/api/products/:id', adminAuth, async (req, res) => {
+  const id = parseInt(req.params.id);
+  const p  = req.body;
+  if (!p.model) return res.status(400).json({ error: 'model is required' });
+  try {
+    if (useDB && pool) {
+      const { rows, rowCount } = await pool.query(
+        `UPDATE products SET category=$1,system=$2,brand=$3,type=$4,series=$5,model=$6,
+         description=$7,specifications=$8,dpp_price=$9,si_price=$10,enduser_price=$11,
+         updated_at=NOW() WHERE id=$12 RETURNING *`,
+        [p.category||'General', p.system||'', p.brand||'', p.type||'', p.series||'',
+         p.model, p.description||'', p.specifications||'',
+         +p.dpp_price||0, +p.si_price||0, +p.enduser_price||0, id]
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Product not found' });
+      await loadProducts();
+      res.json({ success: true, product: rows[0] });
+    } else {
+      const idx = productsCache.findIndex(x => x.id === id);
+      if (idx < 0) return res.status(404).json({ error: 'Product not found' });
+      Object.assign(productsCache[idx], {
+        category: p.category||'General', system: p.system||'', brand: p.brand||'',
+        type: p.type||'', series: p.series||'', model: p.model,
+        description: p.description||'', specifications: p.specifications||'',
+        dpp_price: +p.dpp_price||0, si_price: +p.si_price||0, enduser_price: +p.enduser_price||0
+      });
+      saveJSON();
+      res.json({ success: true, product: productsCache[idx] });
+    }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/products/:id', adminAuth, async (req, res) => {
+  const id = parseInt(req.params.id);
+  try {
+    if (useDB && pool) {
+      const { rowCount } = await pool.query('DELETE FROM products WHERE id=$1', [id]);
+      if (!rowCount) return res.status(404).json({ error: 'Product not found' });
+      await loadProducts();
+    } else {
+      const idx = productsCache.findIndex(x => x.id === id);
+      if (idx < 0) return res.status(404).json({ error: 'Product not found' });
+      productsCache.splice(idx, 1);
+      saveJSON();
+    }
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Upload Excel (admin only) ─────────────────────────────────
+
+app.post('/api/upload', adminAuth, upload.single('excel'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  try {
+    const wb = xlsx.read(req.file.buffer, { type: 'buffer' });
+    const { products: newProds, sheetSummary } = parseExcelSmart(wb);
+    if (!newProds.length) {
       return res.status(400).json({
-        error: 'No products found. Make sure your Excel has columns: Category, System, Brand, Type, Series, Model, Description, Specifications, DPP_Price, SI_Price, EndUser_Price'
+        error: 'No products detected. Ensure the file has Model and at least one price column.',
+        sheetSummary
       });
     }
-
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(newProducts, null, 2));
-    products = newProducts;
-
-    res.json({ success: true, count: newProducts.length });
-  } catch (err) {
-    console.error('Excel error:', err);
-    res.status(500).json({ error: err.message });
+    if (useDB && pool) {
+      await pool.query('DELETE FROM products');
+      await dbInsertBulk(newProds);
+      await loadProducts();
+    } else {
+      productsCache = newProds.map((p, i) => ({ id: i + 1, ...p }));
+      saveJSON();
+    }
+    res.json({ success: true, count: newProds.length, sheetSummary });
+  } catch (e) {
+    console.error('Upload error:', e);
+    res.status(500).json({ error: e.message });
   }
 });
 
-// POST reset to original sample data
-app.post('/api/reset', (req, res) => {
+// ─── Reset (admin only) ────────────────────────────────────────
+
+app.post('/api/reset', adminAuth, async (req, res) => {
   const sampleFile = path.join(__dirname, 'data', 'products.sample.json');
   try {
-    if (fs.existsSync(sampleFile)) {
-      const data = fs.readFileSync(sampleFile, 'utf8');
-      fs.writeFileSync(PRODUCTS_FILE, data);
-      products = JSON.parse(data);
+    let data = [];
+    if (fs.existsSync(sampleFile)) data = JSON.parse(fs.readFileSync(sampleFile, 'utf8'));
+    if (useDB && pool) {
+      await pool.query('DELETE FROM products');
+      if (data.length) await dbInsertBulk(data);
+      await loadProducts();
+    } else {
+      if (fs.existsSync(sampleFile)) fs.copyFileSync(sampleFile, PRODUCTS_FILE);
+      productsCache = data.map((p, i) => ({ id: i + 1, ...p }));
     }
-    res.json({ success: true, count: products.length });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json({ success: true, count: productsCache.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── Excel Converter ──────────────────────────────────────────────────────────
+// ─── Smart Excel Parser ────────────────────────────────────────
 
-function convertExcelToProducts(workbook) {
-  const allProducts = [];
-  const HEADER_KEYWORDS = ['model', 'model no', 'model no.', 'description', 'dpp', 'si', 'installer', 'end user', 'enduser', 'category', 'brand'];
+const COL_ALIASES = {
+  category:       ['category','cat','product category'],
+  system:         ['system','subsystem','sys'],
+  brand:          ['brand','manufacturer','make','mfg','vendor','supplier'],
+  type:           ['type','product type','item type','device type','unit type'],
+  series:         ['series','product series','line','product line','family'],
+  model:          ['model','model no','model no.','model number','part no','part no.',
+                   'part number','item no','item no.','item number','sku','code',
+                   'product code','article','ref','reference','item'],
+  description:    ['description','desc','product name','name','item name','item description',
+                   'title','product description'],
+  specifications: ['specifications','specs','spec','details','technical specs',
+                   'technical description','tech specs','features'],
+  dpp_price:      ['dpp','dpp price','distributor price','dist price','cost','cost price',
+                   'purchase price','buy price','net price'],
+  si_price:       ['si','si price','si/installer','installer','installer price','reseller',
+                   'reseller price','dealer','dealer price','trade','trade price',
+                   'partner price','contractor','si/reseller'],
+  enduser_price:  ['end user','end user price','enduser','enduser price','retail',
+                   'retail price','customer price','list price','list','msrp',
+                   'rsp','rrp','public price','selling price','end-user']
+};
+
+function parseExcelSmart(workbook) {
+  const allProducts  = [];
+  const sheetSummary = [];
 
   workbook.SheetNames.forEach(sheetName => {
     const sheet = workbook.Sheets[sheetName];
-    const rows  = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-    if (!rows || rows.length < 2) return;
+    const rawRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    if (!rawRows || rawRows.length < 2) return;
 
-    // Find header row
-    let headerRowIdx = -1;
-    let headers = [];
+    const rows = rawRows.map(row =>
+      (Array.isArray(row) ? row : []).map(c => String(c ?? '').trim())
+    );
 
-    for (let i = 0; i < Math.min(8, rows.length); i++) {
-      const row = rows[i].map(c => String(c).toLowerCase().trim());
-      const matches = row.filter(h => HEADER_KEYWORDS.some(k => h.includes(k))).length;
-      if (matches >= 2) {
-        headerRowIdx = i;
-        headers = row;
-        break;
+    const sheetMeta = inferSheetMeta(sheetName, rows);
+
+    // Score each of first 12 rows as potential header
+    let headerRowIdx = -1, bestScore = 0;
+    for (let i = 0; i < Math.min(12, rows.length); i++) {
+      const rowLow = rows[i].map(c => c.toLowerCase());
+      let score = 0;
+      for (const aliases of Object.values(COL_ALIASES)) {
+        if (rowLow.some(h => aliases.some(a => h === a || h.includes(a)))) score++;
       }
+      if (score > bestScore) { bestScore = score; headerRowIdx = i; }
     }
 
-    if (headerRowIdx === -1) {
-      // Try to use the sheet as a standard template
-      console.log(`Sheet "${sheetName}" - no recognized header row, skipping`);
+    if (bestScore < 2) {
+      // Try headerless parse using sheet metadata
+      const result = parseHeaderless(rows, sheetMeta);
+      if (result.length > 0) {
+        allProducts.push(...result);
+        sheetSummary.push({ sheet: sheetName, count: result.length, method: 'auto-detect', ...sheetMeta });
+      } else {
+        sheetSummary.push({ sheet: sheetName, count: 0, method: 'skipped – no header', ...sheetMeta });
+      }
       return;
     }
 
-    const idx = {
-      category:       findCol(headers, ['category']),
-      system:         findCol(headers, ['system']),
-      brand:          findCol(headers, ['brand']),
-      type:           findCol(headers, ['type']),
-      series:         findCol(headers, ['series']),
-      model:          findCol(headers, ['model no.', 'model no', 'model']),
-      description:    findCol(headers, ['description', 'desc']),
-      specifications: findCol(headers, ['specifications', 'specs', 'spec']),
-      dpp:            findCol(headers, ['dpp']),
-      si:             findCol(headers, ['si/installer', 'si_price', 'si price', 'installer', 'reseller']),
-      enduser:        findCol(headers, ['end user', 'enduser', 'end_user', 'end useer'])
-    };
+    const headers = rows[headerRowIdx].map(c => c.toLowerCase());
 
-    let currentSection = '';
+    // Map field → column index
+    const idx = {};
+    for (const [field, aliases] of Object.entries(COL_ALIASES)) {
+      idx[field] = -1;
+      for (const alias of aliases) {
+        const ci = headers.findIndex(h => h === alias || h.includes(alias));
+        if (ci !== -1) { idx[field] = ci; break; }
+      }
+    }
+
+    if (idx.model === -1) {
+      sheetSummary.push({ sheet: sheetName, count: 0, method: 'skipped – no model column', ...sheetMeta });
+      return;
+    }
+
+    let ctxSeries   = sheetMeta.series   || '';
+    let ctxType     = sheetMeta.type     || '';
+    let ctxBrand    = sheetMeta.brand    || '';
+    let ctxSystem   = sheetMeta.system   || '';
+    let ctxCategory = sheetMeta.category || '';
+
+    const sheetProds = [];
 
     for (let i = headerRowIdx + 1; i < rows.length; i++) {
       const row = rows[i];
-      if (!row || row.every(c => c === '' || c === null || c === undefined)) continue;
+      if (!row || row.every(c => c === '')) continue;
 
-      const nonEmpty = row.filter(c => String(c).trim() !== '').length;
+      const nonEmpty = row.filter(c => c !== '').length;
+      const hasPrice = row.some(c => !isNaN(parseFloat(c)) && parseFloat(c) > 0.001);
+      const modelVal = idx.model >= 0 ? (row[idx.model] || '') : '';
 
-      // Detect section header rows (rows with only 1-2 non-empty cells, no numeric price)
-      const hasPrice = row.some(c => !isNaN(parseFloat(c)) && parseFloat(c) > 0);
-      if (nonEmpty <= 2 && !hasPrice) {
-        const val = String(row[0] || row[1] || '').trim();
-        if (val) { currentSection = val; continue; }
+      // Section header: few cells, no price → update context
+      if (nonEmpty <= 3 && !hasPrice) {
+        const txt = row.find(c => c !== '') || '';
+        if (txt && txt.length > 1 && !/^(model|description|price)$/i.test(txt)) {
+          ctxSeries = txt;
+          ctxType   = ctxType || txt;
+        }
+        continue;
       }
 
-      const modelVal = idx.model >= 0 ? String(row[idx.model] || '').trim() : '';
-      if (!modelVal || modelVal.toLowerCase() === 'model') continue;
+      if (!modelVal || /^(model|model no\.?|part no\.?|sku|item)$/i.test(modelVal)) continue;
 
-      const get = (i) => i >= 0 ? String(row[i] || '').trim() : '';
-      const price = (i) => i >= 0 ? parseFloat(row[i]) || 0 : 0;
+      const get   = ci => ci >= 0 && row[ci] ? row[ci] : '';
+      const price = ci => { const v = parseFloat(row[ci]); return ci >= 0 && !isNaN(v) ? v : 0; };
 
-      allProducts.push({
-        category:       get(idx.category)  || 'General',
-        system:         get(idx.system)    || sheetName,
-        brand:          get(idx.brand)     || sheetName,
-        type:           get(idx.type)      || currentSection,
-        series:         get(idx.series)    || currentSection,
+      let dpp = price(idx.dpp_price);
+      let si  = price(idx.si_price);
+      let eu  = price(idx.enduser_price);
+
+      // Infer missing prices
+      [dpp, si, eu] = inferPrices(dpp, si, eu, row, idx.model);
+
+      sheetProds.push({
+        category:       get(idx.category)      || ctxCategory || inferCategory(ctxSystem || sheetMeta.system) || 'General',
+        system:         get(idx.system)         || ctxSystem   || sheetMeta.system   || sheetName,
+        brand:          get(idx.brand)          || ctxBrand    || sheetMeta.brand    || sheetName,
+        type:           get(idx.type)           || ctxType     || ctxSeries,
+        series:         get(idx.series)         || ctxSeries,
         model:          modelVal,
         description:    get(idx.description),
         specifications: get(idx.specifications),
-        dpp_price:      price(idx.dpp),
-        si_price:       price(idx.si),
-        enduser_price:  price(idx.enduser)
+        dpp_price:      round3(dpp),
+        si_price:       round3(si),
+        enduser_price:  round3(eu)
       });
     }
+
+    allProducts.push(...sheetProds);
+    sheetSummary.push({ sheet: sheetName, count: sheetProds.length, method: 'header-detected', ...sheetMeta });
   });
 
-  return allProducts;
+  return { products: allProducts, sheetSummary };
 }
 
-function findCol(headers, candidates) {
-  for (const c of candidates) {
-    const idx = headers.findIndex(h => h === c || h.includes(c));
-    if (idx !== -1) return idx;
+function inferPrices(dpp, si, eu, row, modelIdx) {
+  if (dpp > 0 || si > 0 || eu > 0) {
+    if (dpp === 0 && si > 0)  dpp = round3(si * 0.85);
+    if (si  === 0 && dpp > 0) si  = round3(dpp * 1.15);
+    if (eu  === 0 && si > 0)  eu  = round3(si  * 1.20);
+    return [dpp, si, eu];
   }
-  return -1;
+  // No price columns found – scan row for numerics
+  const nums = [];
+  for (let i = 0; i < row.length; i++) {
+    if (i === modelIdx) continue;
+    const v = parseFloat(row[i]);
+    if (!isNaN(v) && v > 0) nums.push(v);
+  }
+  nums.sort((a, b) => a - b);
+  if      (nums.length >= 3) [dpp, si, eu] = nums;
+  else if (nums.length === 2) { [dpp, si] = nums; eu = round3(si * 1.20); }
+  else if (nums.length === 1) { si = nums[0]; dpp = round3(si * 0.85); eu = round3(si * 1.20); }
+  return [dpp, si, eu];
 }
 
-// ─── Page Routes ──────────────────────────────────────────────────────────────
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+function parseHeaderless(rows, sheetMeta) {
+  if (!sheetMeta.brand && !sheetMeta.system) return [];
+  const products = [];
+  const modelPat = /^[A-Za-z0-9][\w\-\.\/]{2,}/;
+  const pricePat = /^\d+\.?\d*$/;
+
+  for (const row of rows) {
+    if (!row || row.every(c => c === '')) continue;
+    const nonEmpty = row.filter(c => c !== '');
+    if (nonEmpty.length < 2) continue;
+
+    const modelIdx = row.findIndex(c => modelPat.test(c) && !pricePat.test(c));
+    if (modelIdx === -1) continue;
+
+    const priceNums = [];
+    for (let i = 0; i < row.length; i++) {
+      if (i === modelIdx) continue;
+      const v = parseFloat(row[i]);
+      if (!isNaN(v) && v > 0) priceNums.push(v);
+    }
+    if (!priceNums.length) continue;
+    priceNums.sort((a, b) => a - b);
+
+    let [dpp, si, eu] = [0, 0, 0];
+    [dpp, si, eu] = inferPrices(...priceNums.slice(0, 3), 0, row, modelIdx);
+
+    const descIdx = row.findIndex((c, i) =>
+      c && i !== modelIdx && !pricePat.test(c) && c !== row[modelIdx]);
+
+    products.push({
+      category:       sheetMeta.category || 'General',
+      system:         sheetMeta.system   || sheetMeta.brand || '',
+      brand:          sheetMeta.brand    || '',
+      type:           '',
+      series:         '',
+      model:          row[modelIdx],
+      description:    descIdx >= 0 ? row[descIdx] : '',
+      specifications: '',
+      dpp_price:      round3(dpp),
+      si_price:       round3(si),
+      enduser_price:  round3(eu)
+    });
+  }
+  return products;
+}
+
+function inferSheetMeta(sheetName, rows) {
+  const KNOWN_BRANDS = [
+    'hikvision','dahua','axis','hanwha','bosch','pelco','uniview','cp plus',
+    'fanvil','yealink','cisco','grandstream','snom',
+    'itc','adastra','bose','toa','inter-m','ahuja',
+    'ubiquiti','mikrotik','tp-link','zyxel','netgear','tp link',
+    'honeywell','paradox','dsc','texecom','ajax','crow'
+  ];
+  const SYSTEM_MAP = {
+    cctv:'CCTV', camera:'CCTV', 'ip cam':'CCTV', nvr:'NVR', dvr:'DVR',
+    'access control':'Access Control', access:'Access Control',
+    alarm:'Intrusion', intrusion:'Intrusion',
+    intercom:'Intercom', 'video door':'Intercom',
+    'public address':'Public Address', ' pa ':'Public Address', audio:'Public Address',
+    speaker:'Public Address', amplifier:'Public Address',
+    phone:'IP Phones', voip:'IP Phones', 'ip phone':'IP Phones',
+    switch:'Networking', router:'Networking', network:'Networking',
+    wifi:'Networking', wireless:'Networking', 'access point':'Networking'
+  };
+
+  const lowerName = sheetName.toLowerCase();
+  let brand = '';
+  for (const b of KNOWN_BRANDS) {
+    if (lowerName.includes(b)) { brand = titleCase(b); break; }
+  }
+  if (!brand && /^[A-Z][A-Za-z\s\-]+$/.test(sheetName.trim())) brand = sheetName.trim();
+
+  let system = '';
+  for (const [key, val] of Object.entries(SYSTEM_MAP)) {
+    if (lowerName.includes(key)) { system = val; break; }
+  }
+
+  // Check title rows
+  if (!brand || !system) {
+    for (let i = 0; i < Math.min(3, rows.length); i++) {
+      const cell = (rows[i][0] || rows[i][1] || '').toLowerCase();
+      if (!brand) {
+        for (const b of KNOWN_BRANDS) {
+          if (cell.includes(b)) { brand = titleCase(b); break; }
+        }
+      }
+      if (!system) {
+        for (const [key, val] of Object.entries(SYSTEM_MAP)) {
+          if (cell.includes(key)) { system = val; break; }
+        }
+      }
+    }
+  }
+
+  return { brand, system, category: inferCategory(system), series: '', type: '' };
+}
+
+function inferCategory(system) {
+  const MAP = {
+    'CCTV':'Security','NVR':'Security','DVR':'Security',
+    'Access Control':'Security','Intrusion':'Security','Intercom':'Security',
+    'Public Address':'Audio',
+    'IP Phones':'Networking','Networking':'Networking'
+  };
+  return MAP[system] || '';
+}
+
+function round3(n) { return Math.round((+n || 0) * 1000) / 1000; }
+
+function titleCase(str) {
+  return str.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// ─── Page Routes ──────────────────────────────────────────────
+app.get('/',          (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/admin',     (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/quotation', (req, res) => res.sendFile(path.join(__dirname, 'public', 'quotation.html')));
+
 app.get('/template', (req, res) => {
-  const templatePath = path.join(__dirname, 'data', 'product_template.xlsx');
-  if (fs.existsSync(templatePath)) {
-    res.download(templatePath, 'MT_Product_Template.xlsx');
+  const tpl = path.join(__dirname, 'data', 'product_template.xlsx');
+  if (fs.existsSync(tpl)) {
+    res.download(tpl, 'MT_Product_Template.xlsx');
   } else {
-    // Generate template on the fly
     const wb = xlsx.utils.book_new();
     const ws = xlsx.utils.aoa_to_sheet([
       ['Category','System','Brand','Type','Series','Model','Description','Specifications','DPP_Price','SI_Price','EndUser_Price'],
@@ -248,7 +647,11 @@ app.get('/template', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 MT Sales Quotation System`);
-  console.log(`   Running at: http://localhost:${PORT}\n`);
+// ─── Start ────────────────────────────────────────────────────
+initDB().then(() => loadProducts()).then(() => {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 MT Sales Quotation System`);
+    console.log(`   Running at: http://localhost:${PORT}`);
+    console.log(`   Admin:      http://localhost:${PORT}/admin\n`);
+  });
 });
