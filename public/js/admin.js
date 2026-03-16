@@ -15,9 +15,25 @@ let editingId     = null;
 let deletingId    = null;
 
 // ─── Init ─────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   if (adminToken) {
-    showApp();
+    // Verify the stored token is still valid on the server before showing
+    // the admin panel — prevents a flash of the UI followed by logout when
+    // the server has restarted and in-memory sessions have been cleared.
+    try {
+      const res = await fetch('/api/admin/stats', {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      if (res.ok) {
+        showApp();
+      } else {
+        adminToken = '';
+        localStorage.removeItem('mt_admin_token');
+      }
+    } catch (_) {
+      // Server unreachable — stay on login screen, don't clear the token
+      // so it can be retried after the server comes back up.
+    }
   }
 });
 
