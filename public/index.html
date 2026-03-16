@@ -469,7 +469,8 @@
         </div>
       </div>
       <div class="summary-actions">
-        <button class="btn btn-outline" style="color:#fff;border-color:rgba(255,255,255,.4);" onclick="addInstallationRow()">+ Installation</button>
+        <button class="btn btn-outline" style="color:#fff;border-color:rgba(255,255,255,.4);" onclick="openInstallationModal()">+ Service / Installation</button>
+        <button class="btn btn-outline" style="color:#fff;border-color:rgba(255,255,255,.4);" onclick="openManualItemModal()">+ Manual Item</button>
         <button class="btn btn-warning" onclick="goToQuotation()">📄 Generate Quotation</button>
       </div>
     </div>
@@ -549,6 +550,98 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeUploadModal()">Cancel</button>
       <button class="btn btn-primary" id="uploadBtn" onclick="uploadFile()" disabled>⬆ Upload & Convert</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ INSTALLATION / SERVICE MODAL ════════════════════ -->
+<div class="modal-overlay hidden" id="installationModal">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      🔧 Add Service / Installation Row
+      <button class="modal-close" onclick="closeInstallationModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Service Type</label>
+        <select id="install-type" class="form-select" onchange="onInstallTypeChange()">
+          <option value="Installation & Configuration">Installation & Configuration</option>
+          <option value="Site Survey">Site Survey</option>
+          <option value="Commissioning">Commissioning</option>
+          <option value="Maintenance">Maintenance</option>
+          <option value="Training">Training</option>
+          <option value="custom">— Custom description —</option>
+        </select>
+      </div>
+      <div class="form-group" id="install-custom-wrap" style="display:none;">
+        <label>Custom Description</label>
+        <input type="text" id="install-custom" class="form-control" placeholder="Enter custom service description">
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label>Unit Price</label>
+          <input type="number" id="install-price" class="form-control" value="200" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" id="install-qty" class="form-control" value="1" min="1" placeholder="1">
+        </div>
+      </div>
+      <div style="background:#f0f6ff;border-radius:7px;padding:10px 14px;font-size:12px;color:var(--text-muted);">
+        This will add a <strong>Service</strong> row to the quotation, grouped under the "Service" section.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeInstallationModal()">Cancel</button>
+      <button class="btn btn-success" onclick="confirmInstallation()">✓ Add to Quotation</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MANUAL ITEM MODAL ═══════════════════════════════ -->
+<div class="modal-overlay hidden" id="manualItemModal">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      ✏ Add Custom Item Manually
+      <button class="modal-close" onclick="closeManualItemModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="input-row">
+        <div class="form-group">
+          <label>Brand</label>
+          <input type="text" id="mi-brand" class="form-control" placeholder="e.g. Hikvision">
+        </div>
+        <div class="form-group">
+          <label>System / Category</label>
+          <input type="text" id="mi-system" class="form-control" placeholder="e.g. CCTV">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Model / Name *</label>
+        <input type="text" id="mi-model" class="form-control" placeholder="e.g. DS-2CD2T47G2-L">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="mi-description" class="form-control" placeholder="Short product description">
+      </div>
+      <div class="form-group">
+        <label>Specifications</label>
+        <input type="text" id="mi-specs" class="form-control" placeholder="Optional technical specs">
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label>Unit Price *</label>
+          <input type="number" id="mi-price" class="form-control" value="0" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Quantity *</label>
+          <input type="number" id="mi-qty" class="form-control" value="1" min="1" placeholder="1">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeManualItemModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmManualItem()">✓ Add to Quotation</button>
     </div>
   </div>
 </div>

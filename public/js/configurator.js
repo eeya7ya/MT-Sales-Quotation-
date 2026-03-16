@@ -340,7 +340,8 @@ function addToQuotation() {
     pricing_mode:   pricingMode,
     si_price:       currentProduct.si_price || 0,
     enduser_price:  currentProduct.enduser_price || 0,
-    dpp_price:      currentProduct.dpp_price || 0
+    dpp_price:      currentProduct.dpp_price || 0,
+    image_data:     currentProduct.image_data || ''
   };
 
   quotationItems.push(item);
@@ -353,20 +354,87 @@ function addToQuotation() {
   recalcCurrentPrice();
 }
 
-function addInstallationRow() {
-  const desc  = prompt('Installation / Service description:', 'Installation & Configuration');
-  if (!desc) return;
-  const price = parseFloat(prompt('Unit price:', '200')) || 0;
-  const qty   = parseInt(prompt('Quantity:', '1')) || 1;
+// ─── Installation / Service Modal ─────────────────────────────
+function openInstallationModal() {
+  document.getElementById('installationModal').classList.remove('hidden');
+  document.getElementById('install-type').value = 'Installation & Configuration';
+  document.getElementById('install-custom-wrap').style.display = 'none';
+  document.getElementById('install-price').value = '200';
+  document.getElementById('install-qty').value = '1';
+}
+
+function closeInstallationModal() {
+  document.getElementById('installationModal').classList.add('hidden');
+}
+
+function onInstallTypeChange() {
+  const val = document.getElementById('install-type').value;
+  document.getElementById('install-custom-wrap').style.display = val === 'custom' ? '' : 'none';
+}
+
+function confirmInstallation() {
+  const typeVal = document.getElementById('install-type').value;
+  const desc = typeVal === 'custom'
+    ? (document.getElementById('install-custom').value.trim() || 'Service')
+    : typeVal;
+  const price = parseFloat(document.getElementById('install-price').value) || 0;
+  const qty   = parseInt(document.getElementById('install-qty').value) || 1;
 
   quotationItems.push({
     id:             Date.now(),
     brand:          '',
-    model:          'Installation',
+    model:          desc,
     description:    desc,
     specifications: '',
     category:       'Service',
     system:         'Service',
+    series:         '',
+    type:           'Service',
+    qty,
+    unit_price:     price,
+    pricing_mode:   'custom',
+    si_price:       price,
+    enduser_price:  price,
+    dpp_price:      price,
+    image_data:     ''
+  });
+
+  saveQuotationItems();
+  renderTable();
+  closeInstallationModal();
+  showToast('✓ Service row added', 'success');
+}
+
+// ─── Manual Item Modal ─────────────────────────────────────────
+function openManualItemModal() {
+  document.getElementById('manualItemModal').classList.remove('hidden');
+  ['mi-brand','mi-system','mi-model','mi-description','mi-specs'].forEach(id =>
+    document.getElementById(id).value = ''
+  );
+  document.getElementById('mi-price').value = '0';
+  document.getElementById('mi-qty').value = '1';
+}
+
+function closeManualItemModal() {
+  document.getElementById('manualItemModal').classList.add('hidden');
+}
+
+function confirmManualItem() {
+  const model = document.getElementById('mi-model').value.trim();
+  if (!model) { showToast('Model / Name is required', 'error'); return; }
+
+  const price  = parseFloat(document.getElementById('mi-price').value) || 0;
+  const qty    = parseInt(document.getElementById('mi-qty').value) || 1;
+  const system = document.getElementById('mi-system').value.trim() || 'General';
+
+  quotationItems.push({
+    id:             Date.now(),
+    brand:          document.getElementById('mi-brand').value.trim(),
+    model,
+    description:    document.getElementById('mi-description').value.trim(),
+    specifications: document.getElementById('mi-specs').value.trim(),
+    category:       system,
+    system,
     series:         '',
     type:           '',
     qty,
@@ -374,12 +442,14 @@ function addInstallationRow() {
     pricing_mode:   'custom',
     si_price:       price,
     enduser_price:  price,
-    dpp_price:      price
+    dpp_price:      price,
+    image_data:     ''
   });
 
   saveQuotationItems();
   renderTable();
-  showToast('✓ Installation row added', 'success');
+  closeManualItemModal();
+  showToast('✓ Item added to quotation', 'success');
 }
 
 function removeItem(id) {

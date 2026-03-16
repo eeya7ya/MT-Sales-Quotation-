@@ -57,67 +57,12 @@
     <a href="/" style="display:inline-block;margin-top:16px;padding:10px 20px;background:#1a3a5c;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;">← Go to Builder</a>
   </div>
 
-  <!-- ════ PRINTABLE DOCUMENT ════════════════════════════════ -->
+  <!-- ════ PRINTABLE DOCUMENT — pages injected by JS ════════ -->
   <div class="quotation-doc" id="quotationDoc">
+    <!-- Logo input (hidden, accessible from any page) -->
+    <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="uploadLogo(this)">
+  </div>
 
-    <!-- Company Header -->
-    <div class="company-header">
-      <div>
-        <label class="company-logo-upload" title="Click to upload company logo">
-          <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="uploadLogo(this)">
-          <div id="logoWrap">
-            <div class="company-logo-placeholder" id="logoPlaceholder">🏢</div>
-          </div>
-          <div class="logo-overlay">Click to add logo</div>
-        </label>
-      </div>
-      <div style="flex:1;text-align:center;">
-        <div style="font-size:22px;font-weight:800;letter-spacing:.3px;" id="companyName">MT Technology Solutions</div>
-        <div style="font-size:12px;opacity:.8;margin-top:3px;" id="companyTagline">Security · Networking · Audio Systems</div>
-      </div>
-      <div class="company-info">
-        <div class="doc-title">Sales Quotation</div>
-        <div style="font-size:11px;opacity:.7;margin-top:5px;" id="headerDate"></div>
-      </div>
-    </div>
-
-    <!-- Project / Client Meta -->
-    <div class="meta-section" id="metaSection">
-      <div class="meta-col" id="metaLeft"></div>
-      <div class="meta-col" id="metaRight"></div>
-    </div>
-
-    <!-- Items -->
-    <div class="items-section" id="itemsSection">
-      <table class="items-table" id="itemsTable">
-        <thead>
-          <tr>
-            <th class="center" style="width:36px;">#</th>
-            <th style="width:70px;">Brand</th>
-            <th style="width:44px;">Picture</th>
-            <th style="width:130px;">Model</th>
-            <th>Description</th>
-            <th class="center" style="width:50px;">Qty</th>
-            <th class="right" style="width:90px;">Unit Price</th>
-            <th class="right" style="width:100px;">Total Price</th>
-          </tr>
-        </thead>
-        <tbody id="itemsBody"></tbody>
-      </table>
-    </div>
-
-    <!-- Notes -->
-    <div class="notes-section" id="notesSection" style="display:none;">
-      <div class="notes-title">Notes & Terms</div>
-      <div class="notes-text" id="notesText"></div>
-    </div>
-
-    <!-- Footer -->
-    <div class="doc-footer" id="docFooter">
-      <div id="footerText">This quotation is valid for 30 days. Prices subject to change without prior notice. | MT Technology Solutions</div>
-    </div>
-
-  </div><!-- end quotation-doc -->
 </div>
 
 <!-- Toast container -->
