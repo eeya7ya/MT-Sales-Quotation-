@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MT Sales Quotation Generator</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .filter-chain {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .filter-step {
+    position: relative;
+    transition: .2s ease;
+  }
+  .filter-step.locked .form-select {
+    background-color: #f5f7fa;
+    color: #aab0bb;
+    cursor: not-allowed;
+  }
+  .filter-step-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px;
+  }
+  .filter-step-label label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-muted);
+  }
+  .filter-step-label .step-badge {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--border);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: .2s ease;
+  }
+  .filter-step.active .step-badge {
+    background: var(--primary);
+    color: #fff;
+  }
+  .filter-step.done .step-badge {
+    background: var(--success);
+    color: #fff;
+  }
+  .clear-filter-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 0 4px;
+    line-height: 1;
+    transition: .15s;
+  }
+  .clear-filter-btn:hover { color: var(--accent); }
+
+  .qty-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .qty-btn {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: .15s;
+    font-weight: 700;
+    color: var(--primary);
+  }
+  .qty-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+  }
+
+  .no-product-hint {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .no-product-hint .hint-icon { font-size: 36px; margin-bottom: 8px; opacity: .4; }
+
+  .section-row-item {
+    font-size: 11px;
+    padding: 3px 8px;
+    background: #e8f0fb;
+    color: var(--primary);
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .table-section-header td {
+    background: #1a3a5c;
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 7px 12px;
+  }
+
+  .pricing-mode-bar {
+    background: #f0f2f5;
+    border-radius: 8px;
+    padding: 3px;
+    display: flex;
+    gap: 3px;
+  }
+  .pm-btn {
+    flex: 1;
+    padding: 7px 6px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .15s;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .pm-btn.active {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(26,58,92,.3);
+  }
+  .pm-btn:hover:not(.active) { background: #e0e7ef; color: var(--primary); }
+
+  .item-model { font-weight: 600; color: var(--primary); }
+  .item-brand { font-size: 11px; color: var(--text-muted); }
+  .item-desc  { font-size: 12px; color: var(--text-muted); }
+
+  .upload-btn-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════ HEADER ═══════════════════════════════════════════ -->
+<header class="app-header">
+  <div class="header-brand">
+    <div class="brand-icon">📋</div>
+    <span>MT Sales Quotation System</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div class="db-status" id="dbStatus">
+      <div class="dot empty" id="dbDot"></div>
+      <span id="dbStatusText">Loading...</span>
+    </div>
+    <div class="header-actions">
+      <button onclick="openUploadModal()">⬆ Upload Database</button>
+      <a href="/template">⬇ Download Template</a>
+      <a href="/quotation" id="viewQuotationBtn" style="background:rgba(230,57,70,.8);">📄 View Quotation</a>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════ MAIN LAYOUT ══════════════════════════════════════ -->
+<div class="main-layout">
+
+  <!-- ── LEFT PANEL: Configurator ────────────────────────── -->
+  <div class="panel-left">
+
+    <!-- Pricing Mode Selector -->
+    <div class="panel-section">
+      <div class="section-title">💰 Pricing Mode</div>
+      <div class="pricing-mode-bar">
+        <button class="pm-btn active" data-mode="si"         onclick="setPricingMode('si',this)">SI Price</button>
+        <button class="pm-btn"       data-mode="contractor"  onclick="setPricingMode('contractor',this)">Contractor</button>
+        <button class="pm-btn"       data-mode="enduser"     onclick="setPricingMode('enduser',this)">End User</button>
+        <button class="pm-btn"       data-mode="custom"      onclick="setPricingMode('custom',this)">Custom ×</button>
+      </div>
+      <div id="customMultiplierWrap" style="display:none;margin-top:10px;">
+        <label class="form-group" style="margin:0">
+          <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">Custom Multiplier (×SI Price)</span>
+          <input type="number" id="customMultiplier" class="form-control" value="1.30" min="1" max="10" step="0.05"
+                 oninput="recalcCurrentPrice()" style="margin-top:5px">
+        </label>
+      </div>
+      <div id="pricingModeDesc" style="margin-top:8px;font-size:12px;color:var(--text-muted);"></div>
+    </div>
+
+    <!-- Product Filter Chain -->
+    <div class="panel-section">
+      <div class="section-title">🔍 Product Selector</div>
+      <div class="filter-chain">
+
+        <div class="filter-step active" id="step-category">
+          <div class="filter-step-label">
+            <label>1 · Category</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <div class="step-badge" id="badge-1">1</div>
+              <button class="clear-filter-btn" onclick="clearFrom('category')" title="Clear">×</button>
+            </div>
+          </div>
+          <select id="sel-category" class="form-select" onchange="onFilterChange('category')">
+            <option value="">— Select Category —</option>
+          </select>
+        </div>
+
+        <div class="filter-step locked" id="step-system">
+          <div class="filter-step-label">
+            <label>2 · System</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <div class="step-badge" id="badge-2">2</div>
+              <button class="clear-filter-btn" onclick="clearFrom('system')" title="Clear">×</button>
+            </div>
+          </div>
+          <select id="sel-system" class="form-select" disabled onchange="onFilterChange('system')">
+            <option value="">— Select System —</option>
+          </select>
+        </div>
+
+        <div class="filter-step locked" id="step-brand">
+          <div class="filter-step-label">
+            <label>3 · Brand</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <div class="step-badge" id="badge-3">3</div>
+              <button class="clear-filter-btn" onclick="clearFrom('brand')" title="Clear">×</button>
+            </div>
+          </div>
+          <select id="sel-brand" class="form-select" disabled onchange="onFilterChange('brand')">
+            <option value="">— Select Brand —</option>
+          </select>
+        </div>
+
+        <div class="filter-step locked" id="step-type">
+          <div class="filter-step-label">
+            <label>4 · Type</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <div class="step-badge" id="badge-4">4</div>
+              <button class="clear-filter-btn" onclick="clearFrom('type')" title="Clear">×</button>
+            </div>
+          </div>
+          <select id="sel-type" class="form-select" disabled onchange="onFilterChange('type')">
+            <option value="">— Select Type —</option>
+          </select>
+        </div>
+
+        <div class="filter-step locked" id="step-series">
+          <div class="filter-step-label">
+            <label>5 · Series</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <div class="step-badge" id="badge-5">5</div>
+              <button class="clear-filter-btn" onclick="clearFrom('series')" title="Clear">×</button>
+            </div>
+          </div>
+          <select id="sel-series" class="form-select" disabled onchange="onFilterChange('series')">
+            <option value="">— Select Series —</option>
+          </select>
+        </div>
+
+        <div class="filter-step locked" id="step-model">
+          <div class="filter-step-label">
+            <label>6 · Model</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <div class="step-badge" id="badge-6">6</div>
+              <button class="clear-filter-btn" onclick="clearFrom('model')" title="Clear">×</button>
+            </div>
+          </div>
+          <select id="sel-model" class="form-select" disabled onchange="onModelSelect()">
+            <option value="">— Select Model —</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Info Card -->
+    <div class="panel-section" id="productInfoSection">
+      <div class="section-title">📦 Product Details</div>
+
+      <div id="noProductHint" class="no-product-hint">
+        <div class="hint-icon">🔎</div>
+        <p>Select a model to view product details</p>
+        <small>Use the filters above to browse the database</small>
+      </div>
+
+      <div id="productCard" class="product-card">
+        <div class="product-card-header">
+          <div>
+            <div class="product-card-model" id="pc-model">—</div>
+            <div class="product-card-desc" id="pc-desc">—</div>
+          </div>
+          <span class="badge badge-primary" id="pc-series-badge"></span>
+        </div>
+
+        <div class="price-grid">
+          <div class="price-cell" id="pcell-dpp">
+            <div class="price-label">DPP</div>
+            <div class="price-value" id="pc-dpp">—</div>
+          </div>
+          <div class="price-cell" id="pcell-si">
+            <div class="price-label">SI</div>
+            <div class="price-value" id="pc-si">—</div>
+          </div>
+          <div class="price-cell" id="pcell-eu">
+            <div class="price-label">End User</div>
+            <div class="price-value" id="pc-eu">—</div>
+          </div>
+        </div>
+
+        <div class="spec-text" id="pc-specs" style="margin-bottom:12px;"></div>
+
+        <div class="calculated-price-row">
+          <div>
+            <div class="cp-label" id="cp-mode-label">SI Price</div>
+            <div style="font-size:11px;opacity:.6">Unit price applied to quotation</div>
+          </div>
+          <div class="cp-value" id="cp-value">—</div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;white-space:nowrap;">Quantity</label>
+          <div class="qty-control">
+            <button class="qty-btn" onclick="adjustQty(-1)">−</button>
+            <input type="number" id="qtyInput" class="qty-input" value="1" min="1" oninput="recalcCurrentPrice()">
+            <button class="qty-btn" onclick="adjustQty(1)">+</button>
+          </div>
+          <div style="flex:1;text-align:right;font-size:13px;color:var(--text-muted)">
+            Total: <strong id="item-total-val" style="color:var(--primary);font-size:15px;">—</strong>
+          </div>
+        </div>
+
+        <button class="btn btn-success btn-full" id="addBtn" onclick="addToQuotation()">
+          ➕ Add to Quotation
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT PANEL: Quotation Builder ──────────────────── -->
+  <div class="panel-right">
+
+    <!-- Customer Info -->
+    <div class="card">
+      <div class="card-header">
+        👤 Customer & Project Information
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;" onclick="toggleCustomerInfo()">Toggle</button>
+      </div>
+      <div class="card-body" id="customerInfoBody">
+        <div class="info-grid">
+          <div class="form-group">
+            <label>Project Name</label>
+            <input type="text" id="fi-project" class="form-control" placeholder="e.g. Private Villa – Security System" oninput="saveCustomerInfo()">
+          </div>
+          <div class="form-group">
+            <label>Client Name</label>
+            <input type="text" id="fi-client" class="form-control" placeholder="Client / Company name" oninput="saveCustomerInfo()">
+          </div>
+          <div class="form-group">
+            <label>Attention (Att.)</label>
+            <input type="text" id="fi-att" class="form-control" placeholder="Contact person" oninput="saveCustomerInfo()">
+          </div>
+          <div class="form-group">
+            <label>Client Phone</label>
+            <input type="text" id="fi-phone" class="form-control" placeholder="+962 XX XXXXXXX" oninput="saveCustomerInfo()">
+          </div>
+          <div class="form-group">
+            <label>Quotation Reference</label>
+            <input type="text" id="fi-ref" class="form-control" placeholder="e.g. QyMT-001" oninput="saveCustomerInfo()">
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="fi-date" class="form-control" oninput="saveCustomerInfo()">
+          </div>
+          <div class="form-group">
+            <label>Prepared By</label>
+            <input type="text" id="fi-prepared" class="form-control" placeholder="Engineer name" oninput="saveCustomerInfo()">
+          </div>
+          <div class="form-group">
+            <label>Sales Engineer Phone</label>
+            <input type="text" id="fi-prepphone" class="form-control" placeholder="Phone number" oninput="saveCustomerInfo()">
+          </div>
+          <div class="form-group">
+            <label>Sales Engineer</label>
+            <input type="text" id="fi-saleseng" class="form-control" placeholder="Sales engineer name" oninput="saveCustomerInfo()">
+          </div>
+          <div class="form-group">
+            <label>Currency</label>
+            <select id="fi-currency" class="form-select" onchange="saveCustomerInfo();renderTable()">
+              <option value="JOD">JOD – Jordanian Dinar</option>
+              <option value="USD">USD – US Dollar</option>
+              <option value="EUR">EUR – Euro</option>
+              <option value="SAR">SAR – Saudi Riyal</option>
+              <option value="AED">AED – UAE Dirham</option>
+              <option value="EGP">EGP – Egyptian Pound</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:4px;">
+          <label>Notes / Terms</label>
+          <textarea id="fi-notes" class="form-control" rows="2" placeholder="Payment terms, delivery notes, validity..." oninput="saveCustomerInfo()" style="resize:vertical;"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quotation Items Table -->
+    <div class="card">
+      <div class="card-header">
+        📋 Quotation Items
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;" onclick="clearAllItems()">🗑 Clear All</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="quotation-wrap">
+          <table class="quotation-table" id="quotationTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Brand</th>
+                <th>Model</th>
+                <th>Description</th>
+                <th>Specifications</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="quotationBody">
+            </tbody>
+          </table>
+          <div id="emptyState" class="empty-state">
+            <div class="empty-icon">🛒</div>
+            <p>No items in quotation yet</p>
+            <small>Select a product from the left panel and click "Add to Quotation"</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Bar -->
+    <div class="summary-bar" id="summaryBar" style="display:none;">
+      <div style="display:flex;gap:30px;">
+        <div class="summary-stat">
+          <div class="stat-val" id="sum-items">0</div>
+          <div class="stat-label">Line Items</div>
+        </div>
+        <div class="summary-stat">
+          <div class="stat-val" id="sum-qty">0</div>
+          <div class="stat-label">Total Units</div>
+        </div>
+        <div class="summary-stat">
+          <div class="stat-val" id="sum-total">0.00</div>
+          <div class="stat-label">Total Cost</div>
+        </div>
+      </div>
+      <div class="summary-actions">
+        <button class="btn btn-outline" style="color:#fff;border-color:rgba(255,255,255,.4);" onclick="addInstallationRow()">+ Installation</button>
+        <button class="btn btn-warning" onclick="goToQuotation()">📄 Generate Quotation</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════ UPLOAD MODAL ════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="uploadModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      ⬆ Upload Product Database (Excel)
+      <button class="modal-close" onclick="closeUploadModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        Upload your Excel price sheet. The system will automatically detect columns and extract all products.
+        Supported formats: <strong>.xlsx, .xls</strong>
+      </p>
+
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('excelFileInput').click()">
+        <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display:none" onchange="handleFileSelect(this)">
+        <div class="upload-icon">📊</div>
+        <p><strong>Click to browse</strong> or drag & drop your Excel file here</p>
+        <small>Max file size: 20MB</small>
+      </div>
+
+      <div id="filePreview" style="display:none;margin-top:16px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#f0f6ff;border-radius:8px;border:1px solid #b8d4f5;">
+          <span style="font-size:24px;">📊</span>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px;" id="fileName"></div>
+            <div style="font-size:12px;color:var(--text-muted);" id="fileSize"></div>
+          </div>
+          <button onclick="clearFileSelection()" style="background:none;border:none;color:#c00;cursor:pointer;font-size:18px;">×</button>
+        </div>
+      </div>
+
+      <div id="uploadProgress" style="display:none;margin-top:16px;">
+        <p style="font-size:13px;margin-bottom:6px;" id="uploadProgressText">Processing...</p>
+        <div class="progress-bar"><div class="bar" id="progressBar" style="width:0%"></div></div>
+      </div>
+
+      <div id="uploadResult" style="display:none;margin-top:14px;"></div>
+
+      <div style="margin-top:18px;padding:12px;background:#fffbea;border-radius:8px;border:1px solid #f4a832;">
+        <div style="font-size:12px;font-weight:700;color:#8a5f00;margin-bottom:6px;">📝 Excel Format Guide</div>
+        <div style="font-size:12px;color:#7a5500;line-height:1.8;">
+          Your Excel file should have a header row with these column names:<br>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">Category</code>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">System</code>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">Brand</code>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">Type</code>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">Series</code>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">Model</code>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">Description</code>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">DPP_Price</code>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">SI_Price</code>
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;">EndUser_Price</code><br>
+          <span style="margin-top:4px;display:block;">You can also use section header rows within the sheet for automatic series detection.</span>
+        </div>
+      </div>
+
+      <!-- Advanced: Column Mapping -->
+      <div style="margin-top:14px;">
+        <button style="background:none;border:none;color:var(--primary-light);cursor:pointer;font-size:13px;font-weight:600;" onclick="toggleAdvanced()">
+          ⚙ Advanced: Manual Column Mapping ▼
+        </button>
+        <div id="advancedMapping" style="display:none;margin-top:12px;">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+            If auto-detection fails, manually map your columns below after selecting a file.
+          </p>
+          <div id="mappingTableWrap"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeUploadModal()">Cancel</button>
+      <button class="btn btn-primary" id="uploadBtn" onclick="uploadFile()" disabled>⬆ Upload & Convert</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script src="/js/configurator.js"></script>
+</body>
+</html>

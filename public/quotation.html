@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quotation — MT Sales System</title>
+<link rel="stylesheet" href="/css/quotation.css">
+<!-- html2pdf for export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  .q-empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: #8a9ab0;
+  }
+  .q-empty-state .icon { font-size: 64px; margin-bottom: 16px; opacity: .4; }
+  .company-logo-upload {
+    position: relative;
+    cursor: pointer;
+  }
+  .logo-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    border-radius: 6px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .company-logo-upload:hover .logo-overlay { display: flex; }
+</style>
+</head>
+<body>
+
+<!-- ═══════ TOOLBAR ══════════════════════════════════════════ -->
+<div class="toolbar" id="toolbar">
+  <div class="toolbar-title">📄 Quotation Preview</div>
+  <div class="toolbar-actions">
+    <a href="/" class="tbtn tbtn-back">← Back to Builder</a>
+    <button class="tbtn tbtn-edit" onclick="editQuotation()">✏ Edit</button>
+    <button class="tbtn tbtn-print" onclick="printQuotation()">🖨 Print</button>
+    <button class="tbtn tbtn-pdf" onclick="exportPDF()">⬇ Export PDF</button>
+  </div>
+</div>
+
+<!-- ═══════ PAGE WRAPPER ════════════════════════════════════ -->
+<div class="page-wrapper">
+
+  <div id="emptyState" class="q-empty-state" style="display:none;">
+    <div class="icon">📋</div>
+    <h2 style="margin-bottom:10px;">No quotation items found</h2>
+    <p>Go back to the builder and add products to your quotation.</p>
+    <a href="/" style="display:inline-block;margin-top:16px;padding:10px 20px;background:#1a3a5c;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;">← Go to Builder</a>
+  </div>
+
+  <!-- ════ PRINTABLE DOCUMENT ════════════════════════════════ -->
+  <div class="quotation-doc" id="quotationDoc">
+
+    <!-- Company Header -->
+    <div class="company-header">
+      <div>
+        <label class="company-logo-upload" title="Click to upload company logo">
+          <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="uploadLogo(this)">
+          <div id="logoWrap">
+            <div class="company-logo-placeholder" id="logoPlaceholder">🏢</div>
+          </div>
+          <div class="logo-overlay">Click to add logo</div>
+        </label>
+      </div>
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:22px;font-weight:800;letter-spacing:.3px;" id="companyName">MT Technology Solutions</div>
+        <div style="font-size:12px;opacity:.8;margin-top:3px;" id="companyTagline">Security · Networking · Audio Systems</div>
+      </div>
+      <div class="company-info">
+        <div class="doc-title">Sales Quotation</div>
+        <div style="font-size:11px;opacity:.7;margin-top:5px;" id="headerDate"></div>
+      </div>
+    </div>
+
+    <!-- Project / Client Meta -->
+    <div class="meta-section" id="metaSection">
+      <div class="meta-col" id="metaLeft"></div>
+      <div class="meta-col" id="metaRight"></div>
+    </div>
+
+    <!-- Items -->
+    <div class="items-section" id="itemsSection">
+      <table class="items-table" id="itemsTable">
+        <thead>
+          <tr>
+            <th class="center" style="width:36px;">#</th>
+            <th style="width:70px;">Brand</th>
+            <th style="width:44px;">Picture</th>
+            <th style="width:130px;">Model</th>
+            <th>Description</th>
+            <th class="center" style="width:50px;">Qty</th>
+            <th class="right" style="width:90px;">Unit Price</th>
+            <th class="right" style="width:100px;">Total Price</th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Notes -->
+    <div class="notes-section" id="notesSection" style="display:none;">
+      <div class="notes-title">Notes & Terms</div>
+      <div class="notes-text" id="notesText"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="doc-footer" id="docFooter">
+      <div id="footerText">This quotation is valid for 30 days. Prices subject to change without prior notice. | MT Technology Solutions</div>
+    </div>
+
+  </div><!-- end quotation-doc -->
+</div>
+
+<!-- Toast container -->
+<div id="toast-container" style="position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;"></div>
+
+<script src="/js/quotation.js"></script>
+</body>
+</html>
