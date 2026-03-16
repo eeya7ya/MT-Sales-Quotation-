@@ -15,9 +15,25 @@ let editingId     = null;
 let deletingId    = null;
 
 // ─── Init ─────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   if (adminToken) {
-    showApp();
+    // Verify the stored token is still valid on the server before showing
+    // the admin panel — prevents a flash of the UI followed by logout when
+    // the server has restarted and in-memory sessions have been cleared.
+    try {
+      const res = await fetch('/api/admin/stats', {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      if (res.ok) {
+        showApp();
+      } else {
+        adminToken = '';
+        localStorage.removeItem('mt_admin_token');
+      }
+    } catch (_) {
+      // Server unreachable — stay on login screen, don't clear the token
+      // so it can be retried after the server comes back up.
+    }
   }
 });
 
@@ -413,12 +429,12 @@ async function confirmDelete() {
 
 // ─── Reset DB ─────────────────────────────────────────────────
 async function doReset() {
-  if (!confirm('Reset the product database to the original sample data?\nThis will remove all current products.')) return;
+  if (!confirm('Clear ALL products from the database?\nThis cannot be undone.')) return;
   try {
     const res  = await apiFetch('/api/reset', { method: 'POST' });
     const data = await res.json();
     if (res.ok && data.success) {
-      showToast(`✓ Reset complete – ${data.count} products loaded`, 'success');
+      showToast('✓ Database cleared – all products removed', 'success');
       await loadProducts();
       await loadStats();
     } else {

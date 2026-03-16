@@ -13,13 +13,13 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Multer ───────────────────────────────────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 300 * 1024 * 1024 },   // 300 MB – supports large price lists
   fileFilter: (_, file, cb) => {
     const ok = file.originalname.match(/\.(xlsx|xls)$/i) ||
       ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -38,7 +38,13 @@ let useDB = false;
   if (!cs) { console.log('ℹ No DB env – using JSON fallback'); return; }
   try {
     const { Pool } = require('pg');
-    pool  = new Pool({ connectionString: cs, ssl: { rejectUnauthorized: false } });
+    pool  = new Pool({
+      connectionString: cs,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10000,   // 10 s – prevents hanging on DB unavailable
+      idleTimeoutMillis:       30000,
+      statement_timeout:       15000    // 15 s query timeout
+    });
     useDB = true;
     console.log('✓ PostgreSQL pool created');
   } catch (e) {
@@ -332,20 +338,29 @@ app.post('/api/upload', adminAuth, upload.single('excel'), async (req, res) => {
 // ─── Reset (admin only) ────────────────────────────────────────
 
 app.post('/api/reset', adminAuth, async (req, res) => {
-  const sampleFile = path.join(__dirname, 'data', 'products.sample.json');
   try {
-    let data = [];
-    if (fs.existsSync(sampleFile)) data = JSON.parse(fs.readFileSync(sampleFile, 'utf8'));
     if (useDB && pool) {
       await pool.query('DELETE FROM products');
-      if (data.length) await dbInsertBulk(data);
       await loadProducts();
     } else {
-      if (fs.existsSync(sampleFile)) fs.copyFileSync(sampleFile, PRODUCTS_FILE);
-      productsCache = data.map((p, i) => ({ id: i + 1, ...p }));
+      productsCache = [];
+      fs.writeFileSync(PRODUCTS_FILE, JSON.stringify([], null, 2));
     }
-    res.json({ success: true, count: productsCache.length });
+    res.json({ success: true, count: 0 });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Multer / global error handler ────────────────────────────
+// Must be defined AFTER all routes so multer errors reach it
+app.use((err, req, res, next) => {   // eslint-disable-line no-unused-vars
+  if (err && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: 'File too large. Maximum allowed size is 300 MB.' });
+  }
+  if (err) {
+    console.error('Unhandled error:', err.message);
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+  next();
 });
 
 // ─── Smart Excel Parser ────────────────────────────────────────
