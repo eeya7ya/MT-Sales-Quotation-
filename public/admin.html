@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin – MT Sales Quotation</title>
+<link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+
+<!-- ════════ LOGIN SCREEN ═══════════════════════════════════ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">🔐</div>
+    <h2>Admin Dashboard</h2>
+    <p>MT Sales Quotation System</p>
+
+    <div class="form-group">
+      <label>Admin Password</label>
+      <input type="password" id="loginPassword" placeholder="Enter password"
+             onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="doLogin()">
+      Login
+    </button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- ════════ ADMIN APP ══════════════════════════════════════ -->
+<div id="adminApp">
+
+  <!-- Header -->
+  <header class="admin-header">
+    <div class="brand">
+      📋 MT Sales — Admin
+      <span id="dbTypeBadge">Loading...</span>
+    </div>
+    <div class="header-actions">
+      <a href="/" class="btn btn-ghost" style="color:rgba(255,255,255,.7);">← Main App</a>
+      <button class="btn btn-ghost" style="color:rgba(255,255,255,.7);" onclick="doLogout()">Logout</button>
+    </div>
+  </header>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-icon">📦</div>
+      <div class="stat-info">
+        <div class="val" id="statTotal">—</div>
+        <div class="lbl">Total Products</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🏷️</div>
+      <div class="stat-info">
+        <div class="val" id="statCategories">—</div>
+        <div class="lbl">Categories</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🏭</div>
+      <div class="stat-info">
+        <div class="val" id="statBrands">—</div>
+        <div class="lbl">Brands</div>
+      </div>
+    </div>
+    <div class="stat-card" style="flex:1;justify-content:flex-end;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="openAddModal()">＋ Add Product</button>
+        <button class="btn btn-success" onclick="openUploadModal()">⬆ Upload Excel</button>
+        <a href="/template" class="btn btn-outline">⬇ Template</a>
+        <button class="btn btn-warning" onclick="doReset()">↺ Reset DB</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toolbar / Filters -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Search model, description, brand…"
+             oninput="onSearch()">
+    </div>
+    <select id="filterCategory" onchange="onFilter()">
+      <option value="">All Categories</option>
+    </select>
+    <select id="filterBrand" onchange="onFilter()">
+      <option value="">All Brands</option>
+    </select>
+    <select id="filterSystem" onchange="onFilter()">
+      <option value="">All Systems</option>
+    </select>
+    <div style="font-size:12px;color:var(--text-muted);white-space:nowrap;" id="filterCount"></div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table class="products-table" id="productsTable">
+      <thead>
+        <tr>
+          <th style="width:40px;">#</th>
+          <th class="sortable" data-col="category" onclick="sortBy('category')">Category <span class="sort-arrow" id="sa-category">↕</span></th>
+          <th class="sortable" data-col="system"   onclick="sortBy('system')">System <span class="sort-arrow" id="sa-system">↕</span></th>
+          <th class="sortable" data-col="brand"    onclick="sortBy('brand')">Brand <span class="sort-arrow" id="sa-brand">↕</span></th>
+          <th class="sortable" data-col="type"     onclick="sortBy('type')">Type <span class="sort-arrow" id="sa-type">↕</span></th>
+          <th class="sortable" data-col="series"   onclick="sortBy('series')">Series <span class="sort-arrow" id="sa-series">↕</span></th>
+          <th class="sortable" data-col="model"    onclick="sortBy('model')">Model <span class="sort-arrow" id="sa-model">↕</span></th>
+          <th>Description</th>
+          <th class="sortable" data-col="dpp_price"    onclick="sortBy('dpp_price')">DPP <span class="sort-arrow" id="sa-dpp_price">↕</span></th>
+          <th class="sortable" data-col="si_price"     onclick="sortBy('si_price')">SI <span class="sort-arrow" id="sa-si_price">↕</span></th>
+          <th class="sortable" data-col="enduser_price" onclick="sortBy('enduser_price')">End User <span class="sort-arrow" id="sa-enduser_price">↕</span></th>
+          <th style="width:100px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr class="empty-row"><td colspan="12">Loading products…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination">
+    <div class="page-info" id="pageInfo"></div>
+    <div class="page-btns" id="pageBtns"></div>
+  </div>
+
+</div><!-- /adminApp -->
+
+<!-- ════════ ADD / EDIT PRODUCT MODAL ═══════════════════════ -->
+<div class="modal-overlay hidden" id="productModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="productModalTitle">Add Product</span>
+      <button class="modal-close" onclick="closeProductModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field-group">
+          <label>Category *</label>
+          <input type="text" id="f-category" placeholder="Security / Audio / Networking" list="dl-category">
+          <datalist id="dl-category"></datalist>
+        </div>
+        <div class="field-group">
+          <label>System *</label>
+          <input type="text" id="f-system" placeholder="CCTV / IP Phones / Public Address" list="dl-system">
+          <datalist id="dl-system"></datalist>
+        </div>
+        <div class="field-group">
+          <label>Brand *</label>
+          <input type="text" id="f-brand" placeholder="Hikvision / Fanvil / ITC" list="dl-brand">
+          <datalist id="dl-brand"></datalist>
+        </div>
+        <div class="field-group">
+          <label>Type</label>
+          <input type="text" id="f-type" placeholder="Analog Camera / IP Camera / …">
+        </div>
+        <div class="field-group">
+          <label>Series</label>
+          <input type="text" id="f-series" placeholder="2MP HD / Pro / …">
+        </div>
+        <div class="field-group">
+          <label>Model *</label>
+          <input type="text" id="f-model" placeholder="e.g. DS-2CD2047G2">
+        </div>
+        <div class="field-group span2">
+          <label>Description</label>
+          <input type="text" id="f-description" placeholder="Short product description">
+        </div>
+        <div class="field-group span2">
+          <label>Specifications</label>
+          <textarea id="f-specifications" rows="2" placeholder="Technical specs, features…"></textarea>
+        </div>
+        <div class="price-fields">
+          <div class="field-group">
+            <label>DPP Price</label>
+            <input type="number" id="f-dpp" placeholder="0.000" step="0.001" min="0">
+          </div>
+          <div class="field-group">
+            <label>SI Price</label>
+            <input type="number" id="f-si" placeholder="0.000" step="0.001" min="0">
+          </div>
+          <div class="field-group">
+            <label>End User Price</label>
+            <input type="number" id="f-eu" placeholder="0.000" step="0.001" min="0">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeProductModal()">Cancel</button>
+      <button class="btn btn-primary" id="saveProductBtn" onclick="saveProduct()">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ DELETE CONFIRM MODAL ═══════════════════════════ -->
+<div class="modal-overlay hidden" id="deleteModal">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      Confirm Delete
+      <button class="modal-close" onclick="closeDeleteModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="delete-confirm">
+        <div class="del-icon">🗑️</div>
+        <h3>Delete Product?</h3>
+        <p id="deleteModelName" style="font-weight:600;color:var(--primary);margin:10px 0 6px;font-size:15px;">—</p>
+        <p>This action cannot be undone.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ UPLOAD MODAL ════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="uploadModal">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      ⬆ Upload Product Database (Excel)
+      <button class="modal-close" onclick="closeUploadModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        Upload your Excel price sheet. The system uses smart multi-sheet parsing to automatically
+        detect columns, brands, and product series. Supported: <strong>.xlsx, .xls</strong>
+      </p>
+
+      <!-- Drop zone -->
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('xlsInput').click()">
+        <input type="file" id="xlsInput" accept=".xlsx,.xls" style="display:none" onchange="onFileSelect(this)">
+        <div class="upload-icon">📊</div>
+        <p><strong>Click to browse</strong> or drag & drop your Excel file here</p>
+        <small>Max file size: 20MB · Supports multiple sheets</small>
+      </div>
+
+      <!-- File selected -->
+      <div class="file-selected" id="fileSelected">
+        <span class="file-icon">📊</span>
+        <div style="flex:1">
+          <div class="file-name" id="selFileName"></div>
+          <div class="file-size" id="selFileSize"></div>
+        </div>
+        <button onclick="clearFileSelection()"
+          style="background:none;border:none;color:#c00;cursor:pointer;font-size:20px;">×</button>
+      </div>
+
+      <!-- Sheet preview (shown after upload) -->
+      <div class="sheet-preview" id="sheetPreview">
+        <h4>📋 Sheet Detection Results</h4>
+        <div id="sheetPreviewBody"></div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap" id="uploadProgressWrap">
+        <div style="font-size:13px;margin-bottom:4px;" id="uploadProgressText">Processing…</div>
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="uploadProgressBar"></div>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div class="upload-result" id="uploadResult"></div>
+
+      <!-- Format guide -->
+      <div class="format-guide mt16">
+        <h4>📝 Excel Format Guide</h4>
+        <div style="font-size:12px;color:#7a5500;line-height:1.9;">
+          Standard columns (any order, auto-detected):
+          <br>
+          <code>Category</code><code>System</code><code>Brand</code><code>Type</code>
+          <code>Series</code><code>Model</code><code>Description</code>
+          <code>DPP_Price</code><code>SI_Price</code><code>EndUser_Price</code>
+          <br>
+          <strong>Multi-sheet support:</strong> Each sheet is parsed independently.
+          Brand &amp; system are inferred from the sheet name when not explicitly listed.
+          Section-header rows (e.g. "Dome Cameras") auto-populate the <em>Type</em> field.
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeUploadModal()">Cancel</button>
+      <button class="btn btn-success" id="uploadSubmitBtn" disabled onclick="submitUpload()">
+        ⬆ Upload & Import
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast-container"></div>
+
+<script src="/js/admin.js"></script>
+</body>
+</html>
