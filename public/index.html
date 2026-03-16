@@ -169,8 +169,8 @@
       <span id="dbStatusText">Loading...</span>
     </div>
     <div class="header-actions">
-      <button onclick="openUploadModal()">⬆ Upload Database</button>
-      <a href="/template">⬇ Download Template</a>
+      <button id="uploadDbBtn" onclick="openUploadModal()" style="display:none;">⬆ Upload Database</button>
+      <a id="downloadTplBtn" href="/template" style="display:none;">⬇ Download Template</a>
       <a href="/admin" style="background:rgba(255,255,255,.15);">⚙ Admin</a>
       <a href="/quotation" id="viewQuotationBtn" style="background:rgba(230,57,70,.8);">📄 View Quotation</a>
     </div>
@@ -386,11 +386,11 @@
             <input type="date" id="fi-date" class="form-control" oninput="saveCustomerInfo()">
           </div>
           <div class="form-group">
-            <label>Prepared By</label>
-            <input type="text" id="fi-prepared" class="form-control" placeholder="Engineer name" oninput="saveCustomerInfo()">
+            <label>Presales Engineer</label>
+            <input type="text" id="fi-prepared" class="form-control" placeholder="Presales Engineer name" oninput="saveCustomerInfo()">
           </div>
           <div class="form-group">
-            <label>Sales Engineer Phone</label>
+            <label>Presales Engineer Phone</label>
             <input type="text" id="fi-prepphone" class="form-control" placeholder="Phone number" oninput="saveCustomerInfo()">
           </div>
           <div class="form-group">
@@ -411,7 +411,7 @@
         </div>
         <div class="form-group" style="margin-top:4px;">
           <label>Notes / Terms</label>
-          <textarea id="fi-notes" class="form-control" rows="2" placeholder="Payment terms, delivery notes, validity..." oninput="saveCustomerInfo()" style="resize:vertical;"></textarea>
+          <textarea id="fi-notes" class="form-control" rows="4" placeholder="Payment terms, delivery notes, validity..." oninput="saveCustomerInfo()" style="resize:vertical;"></textarea>
         </div>
       </div>
     </div>

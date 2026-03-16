@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchProducts();
   setupDragDrop();
   updatePricingModeDesc();
+  checkAdminAccess();
 
   // Set today's date as default
   const dateInput = document.getElementById('fi-date');
@@ -668,6 +669,21 @@ function setupDragDrop() {
       handleFileSelect(fakeInput);
     }
   });
+}
+
+// ─── Admin Access Control ─────────────────────────────────────
+async function checkAdminAccess() {
+  const tok = localStorage.getItem('mt_admin_token');
+  if (!tok) return; // buttons stay hidden
+  try {
+    const res = await fetch('/api/admin/stats', {
+      headers: { Authorization: 'Bearer ' + tok }
+    });
+    if (res.ok) {
+      document.getElementById('uploadDbBtn').style.display = '';
+      document.getElementById('downloadTplBtn').style.display = '';
+    }
+  } catch (_) {}
 }
 
 // ─── Utilities ────────────────────────────────────────────────

@@ -91,10 +91,10 @@ function renderMeta() {
 
   // Right column: reference info
   const right = [
-    ['Ref.',             info.ref      || ''],
-    ['Prepared By',      info.prepared || ''],
-    ['Phone',            info.prepphone|| ''],
-    ['Sales Engineer',   info.saleseng || '']
+    ['Ref.',                    info.ref      || ''],
+    ['Presales Engineer',       info.prepared || ''],
+    ['Presales Engineer Phone', info.prepphone|| ''],
+    ['Sales Engineer',          info.saleseng || '']
   ];
   document.getElementById('metaRight').innerHTML = right
     .filter(([,v]) => v)
