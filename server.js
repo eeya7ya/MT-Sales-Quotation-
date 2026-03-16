@@ -12,9 +12,9 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Multer config for Excel uploads
+// Multer config for Excel uploads (memory storage — works on read-only serverless filesystems)
 const upload = multer({
-  dest: 'uploads/',
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = [
@@ -98,11 +98,10 @@ app.post('/api/upload', upload.single('excel'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   try {
-    const workbook = xlsx.readFile(req.file.path);
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
     const newProducts = convertExcelToProducts(workbook);
 
     if (newProducts.length === 0) {
-      fs.unlinkSync(req.file.path);
       return res.status(400).json({
         error: 'No products found. Make sure your Excel has columns: Category, System, Brand, Type, Series, Model, Description, Specifications, DPP_Price, SI_Price, EndUser_Price'
       });
@@ -110,12 +109,10 @@ app.post('/api/upload', upload.single('excel'), (req, res) => {
 
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(newProducts, null, 2));
     products = newProducts;
-    fs.unlinkSync(req.file.path);
 
     res.json({ success: true, count: newProducts.length });
   } catch (err) {
     console.error('Excel error:', err);
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ error: err.message });
   }
 });
