@@ -413,12 +413,12 @@ async function confirmDelete() {
 
 // ─── Reset DB ─────────────────────────────────────────────────
 async function doReset() {
-  if (!confirm('Reset the product database to the original sample data?\nThis will remove all current products.')) return;
+  if (!confirm('Clear ALL products from the database?\nThis cannot be undone.')) return;
   try {
     const res  = await apiFetch('/api/reset', { method: 'POST' });
     const data = await res.json();
     if (res.ok && data.success) {
-      showToast(`✓ Reset complete – ${data.count} products loaded`, 'success');
+      showToast('✓ Database cleared – all products removed', 'success');
       await loadProducts();
       await loadStats();
     } else {
