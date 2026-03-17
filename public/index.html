@@ -195,9 +195,21 @@
       <div id="customMultiplierWrap" style="display:none;margin-top:10px;">
         <label class="form-group" style="margin:0">
           <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">Custom Multiplier (×SI Price)</span>
-          <input type="number" id="customMultiplier" class="form-control" value="1.30" min="1" max="10" step="0.05"
+          <input type="number" id="customMultiplier" class="form-control" value="1.30" min="0.01" max="100" step="0.05"
                  oninput="recalcCurrentPrice()" style="margin-top:5px">
         </label>
+      </div>
+      <!-- Global price multiplier — applies on top of any selected mode -->
+      <div style="margin-top:10px;background:#fff8e6;border:1px solid #f4a832;border-radius:7px;padding:10px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:11px;font-weight:700;color:#8a5f00;text-transform:uppercase;letter-spacing:.4px;">× Price Multiplier</span>
+          <button onclick="resetGlobalMultiplier()" style="background:none;border:none;cursor:pointer;font-size:11px;color:#a0784a;font-weight:600;padding:0;">Reset ×1.00</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="number" id="globalMultiplier" class="form-control" value="1.00" min="0.01" max="100" step="0.05"
+                 oninput="recalcCurrentPrice();renderTable()" style="flex:1;">
+          <span style="font-size:11px;color:#8a5f00;white-space:nowrap;">× all modes</span>
+        </div>
       </div>
       <div id="pricingModeDesc" style="margin-top:8px;font-size:12px;color:var(--text-muted);"></div>
     </div>
@@ -563,6 +575,12 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
+        <label>Assign to System</label>
+        <select id="install-system" class="form-select">
+          <option value="Service">— General Service (separate section) —</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Service Type</label>
         <select id="install-type" class="form-select" onchange="onInstallTypeChange()">
           <option value="Installation & Configuration">Installation & Configuration</option>
@@ -588,7 +606,7 @@
         </div>
       </div>
       <div style="background:#f0f6ff;border-radius:7px;padding:10px 14px;font-size:12px;color:var(--text-muted);">
-        This will add a <strong>Service</strong> row to the quotation, grouped under the "Service" section.
+        Select a system above to group this service <strong>under that system</strong>, or leave as "General Service" for a separate section.
       </div>
     </div>
     <div class="modal-footer">

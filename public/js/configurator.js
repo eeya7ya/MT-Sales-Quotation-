@@ -284,18 +284,32 @@ function updatePricingModeDesc() {
   document.getElementById('pricingModeDesc').textContent = descs[pricingMode] || '';
 }
 
+function getGlobalMultiplier() {
+  return parseFloat(document.getElementById('globalMultiplier').value) || 1;
+}
+
+function resetGlobalMultiplier() {
+  document.getElementById('globalMultiplier').value = '1.00';
+  recalcCurrentPrice();
+  renderTable();
+}
+
 function getUnitPrice(p) {
   if (!p) return 0;
+  const gm = getGlobalMultiplier();
+  let base = 0;
   switch (pricingMode) {
-    case 'si':         return p.si_price || 0;
-    case 'contractor': return (p.si_price || 0) * 1.25;
-    case 'enduser':    return p.enduser_price || 0;
+    case 'si':         base = p.si_price || 0; break;
+    case 'contractor': base = (p.si_price || 0) * 1.25; break;
+    case 'enduser':    base = p.enduser_price || 0; break;
     case 'custom': {
       const m = parseFloat(document.getElementById('customMultiplier').value) || 1;
-      return (p.si_price || 0) * m;
+      base = (p.si_price || 0) * m;
+      break;
     }
-    default: return p.si_price || 0;
+    default: base = p.si_price || 0;
   }
+  return base * gm;
 }
 
 function recalcCurrentPrice() {
@@ -361,6 +375,24 @@ function openInstallationModal() {
   document.getElementById('install-custom-wrap').style.display = 'none';
   document.getElementById('install-price').value = '200';
   document.getElementById('install-qty').value = '1';
+
+  // Populate system dropdown from existing quotation items
+  const systemSel = document.getElementById('install-system');
+  const current = systemSel.value;
+  systemSel.innerHTML = '<option value="Service">— General Service (separate section) —</option>';
+  const systems = [...new Set(
+    quotationItems
+      .filter(i => i.system && i.system !== 'Service')
+      .map(i => i.system)
+  )];
+  systems.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    systemSel.appendChild(opt);
+  });
+  // Restore selection if still valid
+  if ([...systemSel.options].some(o => o.value === current)) systemSel.value = current;
 }
 
 function closeInstallationModal() {
@@ -377,8 +409,9 @@ function confirmInstallation() {
   const desc = typeVal === 'custom'
     ? (document.getElementById('install-custom').value.trim() || 'Service')
     : typeVal;
-  const price = parseFloat(document.getElementById('install-price').value) || 0;
-  const qty   = parseInt(document.getElementById('install-qty').value) || 1;
+  const price  = parseFloat(document.getElementById('install-price').value) || 0;
+  const qty    = parseInt(document.getElementById('install-qty').value) || 1;
+  const system = document.getElementById('install-system').value || 'Service';
 
   quotationItems.push({
     id:             Date.now(),
@@ -386,8 +419,8 @@ function confirmInstallation() {
     model:          desc,
     description:    desc,
     specifications: '',
-    category:       'Service',
-    system:         'Service',
+    category:       system === 'Service' ? 'Service' : system,
+    system:         system,
     series:         '',
     type:           'Service',
     qty,
@@ -536,9 +569,10 @@ function renderTable() {
   // Grand total row
   html += `
     <tr class="grand-total-row">
-      <td colspan="6" style="text-align:right;padding-right:16px;">Total Material Cost:</td>
-      <td colspan="2" style="text-align:center;font-size:16px;color:var(--accent);">${fmt(grandTotal, currency)}</td>
-      <td></td>
+      <td colspan="9" style="text-align:center;padding:12px 16px;">
+        <span style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.5px;">Total Material Cost:</span>
+        <span style="font-size:16px;color:var(--accent);font-weight:700;margin-left:12px;">${fmt(grandTotal, currency)}</span>
+      </td>
     </tr>`;
 
   tbody.innerHTML = html;
