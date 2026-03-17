@@ -28,7 +28,6 @@ async function sendChat() {
 
   input.value = '';
   appendChatMsg('user', msg);
-  chatHistory.push({ role: 'user', content: msg });
 
   const typingEl = appendTyping();
   setSendDisabled(true);
@@ -46,6 +45,7 @@ async function sendChat() {
     if (!res.ok || data.error) {
       appendChatMsg('bot', '⚠ ' + (data.error || 'Something went wrong. Please try again.') + (data.details ? '\n' + data.details : ''));
     } else {
+      chatHistory.push({ role: 'user', content: msg });
       appendChatMsg('bot', data.reply);
       chatHistory.push({ role: 'assistant', content: data.reply });
     }

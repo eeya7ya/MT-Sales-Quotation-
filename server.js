@@ -729,7 +729,7 @@ Be concise, professional, and helpful. Answer in the same language as the user.$
 
     const groqRes = await httpsPost(
       'https://api.groq.com/openai/v1/chat/completions',
-      { model: 'openai/gpt-oss-120b', messages: groqMessages, max_completion_tokens: 8192, temperature: 1, top_p: 1, reasoning_effort: 'medium' },
+      { model: 'llama-3.3-70b-versatile', messages: groqMessages, max_tokens: 1024, temperature: 0.7 },
       { 'Authorization': `Bearer ${GROQ_KEY}` }
     );
 
