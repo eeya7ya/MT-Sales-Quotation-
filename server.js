@@ -395,7 +395,9 @@ const COL_ALIASES = {
                    'partner price','contractor','si/reseller'],
   enduser_price:  ['end user','end user price','enduser','enduser price','retail',
                    'retail price','customer price','list price','list','msrp',
-                   'rsp','rrp','public price','selling price','end-user']
+                   'rsp','rrp','public price','selling price','end-user'],
+  image_data:     ['image_url','image url','image','photo','picture','img','photo url',
+                   'product image','product photo','thumbnail']
 };
 
 function parseExcelSmart(workbook) {
@@ -502,7 +504,8 @@ function parseExcelSmart(workbook) {
         specifications: get(idx.specifications),
         dpp_price:      round3(dpp),
         si_price:       round3(si),
-        enduser_price:  round3(eu)
+        enduser_price:  round3(eu),
+        image_data:     get(idx.image_data) || null
       });
     }
 
@@ -672,9 +675,9 @@ app.get('/template', (req, res) => {
   } else {
     const wb = xlsx.utils.book_new();
     const ws = xlsx.utils.aoa_to_sheet([
-      ['Category','System','Brand','Type','Series','Model','Description','Specifications','DPP_Price','SI_Price','EndUser_Price'],
-      ['Security','CCTV','Hikvision','IP Camera','4MP','DS-2CD2047G2','4MP ColorVu Fixed Bullet','4MP, 2.8mm, ColorVu',55,60,70],
-      ['Security','CCTV','Dahua','Dome','2MP','IPC-HDW2831T-AS','2MP IR Fixed-focal Dome','2MP, 2.8mm, IR30m',35,40,48],
+      ['Category','System','Brand','Type','Series','Model','Description','Specifications','DPP_Price','SI_Price','EndUser_Price','Image_URL'],
+      ['Security','CCTV','Hikvision','IP Camera','4MP','DS-2CD2047G2','4MP ColorVu Fixed Bullet','4MP, 2.8mm, ColorVu',55,60,70,''],
+      ['Security','CCTV','Dahua','Dome','2MP','IPC-HDW2831T-AS','2MP IR Fixed-focal Dome','2MP, 2.8mm, IR30m',35,40,48,''],
     ]);
     xlsx.utils.book_append_sheet(wb, ws, 'Products');
     const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });

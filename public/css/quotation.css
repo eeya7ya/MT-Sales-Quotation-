@@ -81,6 +81,9 @@ body {
   box-shadow: 0 4px 24px rgba(0,0,0,.12);
   overflow: hidden;
   margin-bottom: 32px;
+}
+/* Only non-last pages get a forced break AFTER them */
+.q-page:not(.q-last-page) {
   page-break-after: always;
   break-after: page;
 }
@@ -227,14 +230,14 @@ body {
 }
 
 /* Column widths — tuned for A4 */
-.items-table col.col-num   { width: 30px; }
-.items-table col.col-brand { width: 60px; }
-.items-table col.col-pic   { width: 48px; }
-.items-table col.col-model { width: 140px; }
+.items-table col.col-num   { width: 28px; }
+.items-table col.col-brand { width: 56px; }
+.items-table col.col-pic   { width: 62px; }
+.items-table col.col-model { width: 110px; }
 .items-table col.col-desc  { width: auto; }
-.items-table col.col-qty   { width: 36px; }
-.items-table col.col-price { width: 82px; }
-.items-table col.col-total { width: 88px; }
+.items-table col.col-qty   { width: 34px; }
+.items-table col.col-price { width: 86px; }
+.items-table col.col-total { width: 90px; }
 
 .items-table th {
   background: #edf1f6;
@@ -270,7 +273,7 @@ body {
 .td-total { text-align: right; font-weight: 700; white-space: nowrap; color: var(--primary); font-size: 11.5px; }
 
 .product-thumb {
-  width: 36px; height: 36px;
+  width: 48px; height: 48px;
   object-fit: contain;
   border-radius: 3px;
   background: #f5f7fa;
@@ -279,10 +282,10 @@ body {
   display: block;
   margin: 0 auto;
 }
-/* Blank placeholder when no image */
+/* Blank placeholder when no image — zero size so row doesn't expand */
 .product-thumb-blank {
-  width: 36px; height: 36px;
-  display: inline-block;
+  width: 0; height: 0;
+  display: block;
 }
 
 .subtotal-row td {
@@ -309,7 +312,7 @@ body {
   letter-spacing: .5px;
 }
 .total-value {
-  text-align: right;
+  text-align: center;
   color: var(--accent);
   font-size: 14px;
   background: #fff3cd !important;
@@ -345,6 +348,8 @@ body {
     box-shadow: none;
     border-radius: 0;
     margin-bottom: 0;
+  }
+  .q-page:not(.q-last-page) {
     page-break-after: always;
     break-after: page;
   }

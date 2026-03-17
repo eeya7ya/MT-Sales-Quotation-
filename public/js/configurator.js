@@ -338,6 +338,9 @@ function addToQuotation() {
 
   const qty  = parseInt(document.getElementById('qtyInput').value) || 1;
   const unit = getUnitPrice(currentProduct);
+  // Store base_price = unit before global multiplier, so renderTable can re-apply live
+  const gm   = getGlobalMultiplier();
+  const base = gm > 0 ? unit / gm : unit;
 
   const item = {
     id:             Date.now(),
@@ -351,6 +354,7 @@ function addToQuotation() {
     type:           currentProduct.type || '',
     qty,
     unit_price:     unit,
+    base_price:     base,
     pricing_mode:   pricingMode,
     si_price:       currentProduct.si_price || 0,
     enduser_price:  currentProduct.enduser_price || 0,
@@ -425,7 +429,9 @@ function confirmInstallation() {
     type:           'Service',
     qty,
     unit_price:     price,
+    base_price:     price,
     pricing_mode:   'custom',
+    _fixed_price:   true,
     si_price:       price,
     enduser_price:  price,
     dpp_price:      price,
@@ -441,11 +447,45 @@ function confirmInstallation() {
 // ─── Manual Item Modal ─────────────────────────────────────────
 function openManualItemModal() {
   document.getElementById('manualItemModal').classList.remove('hidden');
-  ['mi-brand','mi-system','mi-model','mi-description','mi-specs'].forEach(id =>
+  ['mi-brand','mi-model','mi-description','mi-specs'].forEach(id =>
     document.getElementById(id).value = ''
   );
   document.getElementById('mi-price').value = '0';
   document.getElementById('mi-qty').value = '1';
+
+  // Populate system dropdown from existing quotation items
+  const systemSel = document.getElementById('mi-system');
+  const existing = systemSel.value;
+  systemSel.innerHTML = '';
+  const systems = [...new Set(
+    quotationItems.filter(i => i.system).map(i => i.system)
+  )];
+  // Always include a "General" fallback plus any new-system option
+  if (!systems.includes('General')) systems.unshift('General');
+  systems.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    systemSel.appendChild(opt);
+  });
+  // Option to type a new system
+  const newOpt = document.createElement('option');
+  newOpt.value = '__new__'; newOpt.textContent = '+ New system…';
+  systemSel.appendChild(newOpt);
+
+  if ([...systemSel.options].some(o => o.value === existing)) systemSel.value = existing;
+  systemSel.onchange = () => {
+    if (systemSel.value === '__new__') {
+      const name = prompt('Enter new system name:');
+      if (name && name.trim()) {
+        const o = document.createElement('option');
+        o.value = name.trim(); o.textContent = name.trim();
+        systemSel.insertBefore(o, newOpt);
+        systemSel.value = name.trim();
+      } else {
+        systemSel.value = systems[0] || 'General';
+      }
+    }
+  };
 }
 
 function closeManualItemModal() {
@@ -458,7 +498,9 @@ function confirmManualItem() {
 
   const price  = parseFloat(document.getElementById('mi-price').value) || 0;
   const qty    = parseInt(document.getElementById('mi-qty').value) || 1;
-  const system = document.getElementById('mi-system').value.trim() || 'General';
+  const systemSel = document.getElementById('mi-system');
+  const system = (systemSel.value && systemSel.value !== '__new__')
+    ? systemSel.value : 'General';
 
   quotationItems.push({
     id:             Date.now(),
@@ -472,7 +514,9 @@ function confirmManualItem() {
     type:           '',
     qty,
     unit_price:     price,
+    base_price:     price,
     pricing_mode:   'custom',
+    _fixed_price:   true,
     si_price:       price,
     enduser_price:  price,
     dpp_price:      price,
@@ -537,11 +581,18 @@ function renderTable() {
   let itemNum = 1;
   let grandTotal = 0;
   let grandQty   = 0;
+  const gm = getGlobalMultiplier();
 
   Object.entries(grouped).forEach(([system, items]) => {
     html += `<tr class="table-section-header"><td colspan="9">${system.toUpperCase()}</td></tr>`;
     items.forEach(item => {
-      const total = item.unit_price * item.qty;
+      // Fixed-price items (manual/service) ignore global multiplier
+      const effectivePrice = item._fixed_price
+        ? item.unit_price
+        : (item.base_price !== undefined ? item.base_price * gm : item.unit_price);
+      // Keep stored unit_price in sync
+      item.unit_price = effectivePrice;
+      const total = effectivePrice * item.qty;
       grandTotal += total;
       grandQty   += item.qty;
       html += `
@@ -559,7 +610,7 @@ function renderTable() {
               <button class="qty-btn" style="width:22px;height:22px;font-size:13px;" onclick="updateQty(${item.id}, ${item.qty + 1})">+</button>
             </div>
           </td>
-          <td class="price-badge">${fmt(item.unit_price, currency)}</td>
+          <td class="price-badge">${fmt(effectivePrice, currency)}</td>
           <td class="total-price-cell">${fmt(total, currency)}</td>
           <td><button class="remove-btn" onclick="removeItem(${item.id})" title="Remove item">✕</button></td>
         </tr>`;
