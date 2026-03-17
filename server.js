@@ -7,6 +7,7 @@ const path    = require('path');
 const fs      = require('fs');
 const cors    = require('cors');
 const crypto  = require('crypto');
+const https   = require('https');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -650,6 +651,100 @@ function round3(n) { return Math.round((+n || 0) * 1000) / 1000; }
 function titleCase(str) {
   return str.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
+
+// ─── AI Chatbot (Groq + Tavily) ────────────────────────────────
+
+function httpsPost(url, body, extraHeaders = {}) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const u = new URL(url);
+    const opts = {
+      hostname: u.hostname,
+      path: u.pathname + (u.search || ''),
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+        ...extraHeaders
+      }
+    };
+    const req = https.request(opts, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch (_) { resolve({ status: res.statusCode, body: data }); }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+app.post('/api/chat', async (req, res) => {
+  const { message, history = [] } = req.body || {};
+  if (!message) return res.status(400).json({ error: 'message is required' });
+
+  const GROQ_KEY   = process.env.GROQ_API_KEY;
+  const TAVILY_KEY = process.env.TAVILY_API_KEY;
+
+  if (!GROQ_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not configured on server' });
+
+  try {
+    // Optional: Tavily web search for queries that need current info
+    let searchContext = '';
+    const needsSearch = TAVILY_KEY && /price|latest|find|search|buy|where|how much|product|spec/i.test(message);
+    if (needsSearch) {
+      try {
+        const tav = await httpsPost(
+          'https://api.tavily.com/search',
+          { api_key: TAVILY_KEY, query: message, search_depth: 'basic', max_results: 3, include_answer: true }
+        );
+        if (tav.body && tav.body.results) {
+          const snippets = tav.body.results
+            .slice(0, 3)
+            .map(r => `• ${r.title}: ${(r.content || '').slice(0, 200)}`)
+            .join('\n');
+          searchContext = `\n\nRelevant web search results:\n${snippets}`;
+        }
+      } catch (e) {
+        console.warn('Tavily search error:', e.message);
+      }
+    }
+
+    const systemPrompt = `You are an AI assistant for MT Technology Solutions — a security and technology solutions company. You help with:
+- Sales quotation guidance and product selection
+- Security system recommendations (CCTV, Access Control, Intrusion, IP Phones, Networking)
+- Technical specifications and pricing advice
+- Quotation best practices
+
+Be concise, professional, and helpful. Answer in the same language as the user.${searchContext}`;
+
+    const groqMessages = [
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-10),   // keep last 10 turns for context
+      { role: 'user', content: message }
+    ];
+
+    const groqRes = await httpsPost(
+      'https://api.groq.com/openai/v1/chat/completions',
+      { model: 'llama-3.1-70b-versatile', messages: groqMessages, max_tokens: 1024, temperature: 0.7 },
+      { 'Authorization': `Bearer ${GROQ_KEY}` }
+    );
+
+    if (groqRes.status !== 200) {
+      console.error('Groq error:', groqRes.body);
+      return res.status(502).json({ error: 'AI service error', details: groqRes.body?.error?.message });
+    }
+
+    const reply = groqRes.body?.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
+    res.json({ reply });
+  } catch (e) {
+    console.error('Chat endpoint error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ─── Page Routes ──────────────────────────────────────────────
 app.get('/',          (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
