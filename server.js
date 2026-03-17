@@ -683,11 +683,10 @@ function httpsPost(url, body, extraHeaders = {}) {
 }
 
 app.post('/api/chat', async (req, res) => {
-  const { message, history = [] } = req.body || {};
-  if (!message) return res.status(400).json({ error: 'message is required' });
+  const { message, history = [], image } = req.body || {};
+  if (!message && !image) return res.status(400).json({ error: 'message or image is required' });
 
-  const GROQ_KEY   = process.env.GROQ_API_KEY;
-  const TAVILY_KEY = process.env.TAVILY_API_KEY;
+  const GROQ_KEY = process.env.GROQ_API_KEY;
 
   if (!GROQ_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not configured on server' });
 
@@ -701,18 +700,40 @@ app.post('/api/chat', async (req, res) => {
 - Quotation best practices
 
 Today's date is ${today} (Jordan time).
-Be concise, professional, and helpful. Answer in the same language as the user.`;
+
+STRICT RULES — follow exactly:
+1. Give ONE clear answer. Never repeat the same information twice in a response.
+2. Do not restate or summarise what you just said at the end.
+3. Be concise — use bullet points for lists, plain sentences otherwise.
+4. Do not add disclaimers like "I hope this helps" or "Let me know if you need more".
+5. Answer in the same language as the user.`;
+
+    // Build the user content — multimodal if an image is provided
+    let userContent;
+    if (image) {
+      // image is a base64 data URL, e.g. "data:image/jpeg;base64,..."
+      const matches = image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (!matches) return res.status(400).json({ error: 'Invalid image format. Expected base64 data URL.' });
+      userContent = [
+        { type: 'image_url', image_url: { url: image } },
+        { type: 'text', text: message || 'Describe this image and identify the product or security device shown.' }
+      ];
+    } else {
+      userContent = message;
+    }
+
+    // Use vision model when image is present, compound-beta (with web search) otherwise
+    const model = image ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'compound-beta';
 
     const groqMessages = [
       { role: 'system', content: systemPrompt },
-      ...history.slice(-10),   // keep last 10 turns for context
-      { role: 'user', content: message }
+      ...history.slice(-10),
+      { role: 'user', content: userContent }
     ];
 
-    // compound-beta has built-in web search — no external search API needed
     const groqRes = await httpsPost(
       'https://api.groq.com/openai/v1/chat/completions',
-      { model: 'compound-beta', messages: groqMessages, max_tokens: 1024, temperature: 0.7 },
+      { model, messages: groqMessages, max_tokens: 1024, temperature: 0.5 },
       { 'Authorization': `Bearer ${GROQ_KEY}` }
     );
 

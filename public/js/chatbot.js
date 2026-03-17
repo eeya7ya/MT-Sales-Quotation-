@@ -3,8 +3,9 @@
 ═══════════════════════════════════════════════════════════════ */
 'use strict';
 
-let chatOpen    = false;
-let chatHistory = [];  // [{role, content}, ...]
+let chatOpen      = false;
+let chatHistory   = [];  // [{role, content}, ...]
+let pendingImage  = null; // base64 data URL of attached image
 
 function toggleChat() {
   chatOpen = !chatOpen;
@@ -21,22 +22,58 @@ function toggleChat() {
   }
 }
 
+function handleChatImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+  if (file.size > 4 * 1024 * 1024) { alert('Image too large. Max 4 MB.'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    pendingImage = e.target.result;
+    const row = document.getElementById('chatImagePreviewRow');
+    const thumb = document.getElementById('chatImagePreview');
+    thumb.src = pendingImage;
+    row.style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+  // reset so the same file can be reselected
+  input.value = '';
+}
+
+function clearChatImage() {
+  pendingImage = null;
+  document.getElementById('chatImagePreviewRow').style.display = 'none';
+  document.getElementById('chatImagePreview').src = '';
+}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const msg   = input.value.trim();
-  if (!msg) return;
+  const image = pendingImage;
+
+  if (!msg && !image) return;
 
   input.value = '';
-  appendChatMsg('user', msg);
+  clearChatImage();
+
+  // Show user message (with thumbnail if image)
+  if (image) {
+    appendChatMsgWithImage('user', msg, image);
+  } else {
+    appendChatMsg('user', msg);
+  }
 
   const typingEl = appendTyping();
   setSendDisabled(true);
 
   try {
+    const body = { message: msg, history: chatHistory.slice(-10) };
+    if (image) body.image = image;
+
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, history: chatHistory.slice(-10) })
+      body: JSON.stringify(body)
     });
 
     const data = await res.json();
@@ -45,7 +82,7 @@ async function sendChat() {
     if (!res.ok || data.error) {
       appendChatMsg('bot', '⚠ ' + (data.error || 'Something went wrong. Please try again.') + (data.details ? '\n' + data.details : ''));
     } else {
-      chatHistory.push({ role: 'user', content: msg });
+      chatHistory.push({ role: 'user', content: msg || '(image)' });
       appendChatMsg('bot', data.reply);
       chatHistory.push({ role: 'assistant', content: data.reply });
     }
@@ -67,6 +104,17 @@ function appendChatMsg(role, text) {
   } else {
     div.innerHTML = `<div class="chat-bubble">${escChatHtml(text)}</div>`;
   }
+  messages.appendChild(div);
+  scrollChatBottom();
+  return div;
+}
+
+function appendChatMsgWithImage(role, text, imageSrc) {
+  const messages = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = `chat-msg chat-msg-${role === 'user' ? 'user' : 'bot'}`;
+  const textPart = text ? `<div class="chat-bubble-text">${escChatHtml(text)}</div>` : '';
+  div.innerHTML = `<div class="chat-bubble chat-bubble-image"><img src="${imageSrc}" class="chat-sent-image" alt="attached image">${textPart}</div>`;
   messages.appendChild(div);
   scrollChatBottom();
   return div;
