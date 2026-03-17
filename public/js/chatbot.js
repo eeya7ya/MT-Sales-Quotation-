@@ -12,12 +12,12 @@ function toggleChat() {
   const icon  = document.getElementById('chatBtnIcon');
   if (chatOpen) {
     panel.style.display = 'flex';
-    icon.textContent = '✕';
+    icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
     document.getElementById('chatInput').focus();
     scrollChatBottom();
   } else {
     panel.style.display = 'none';
-    icon.textContent = '💬';
+    icon.innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg>';
   }
 }
 
@@ -62,7 +62,11 @@ function appendChatMsg(role, text) {
   const messages = document.getElementById('chatMessages');
   const div = document.createElement('div');
   div.className = `chat-msg chat-msg-${role === 'user' ? 'user' : 'bot'}`;
-  div.innerHTML = `<div class="chat-bubble">${escChatHtml(text)}</div>`;
+  if (role !== 'user') {
+    div.innerHTML = `<div class="chat-bot-avatar">✨</div><div class="chat-bubble">${escChatHtml(text)}</div>`;
+  } else {
+    div.innerHTML = `<div class="chat-bubble">${escChatHtml(text)}</div>`;
+  }
   messages.appendChild(div);
   scrollChatBottom();
   return div;
@@ -72,7 +76,7 @@ function appendTyping() {
   const messages = document.getElementById('chatMessages');
   const div = document.createElement('div');
   div.className = 'chat-msg chat-msg-bot chat-typing';
-  div.innerHTML = '<div class="chat-bubble">Thinking…</div>';
+  div.innerHTML = '<div class="chat-bot-avatar">✨</div><div class="chat-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
   messages.appendChild(div);
   scrollChatBottom();
   return div;
