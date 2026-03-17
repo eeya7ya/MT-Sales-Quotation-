@@ -44,7 +44,7 @@ async function sendChat() {
     typingEl.remove();
 
     if (!res.ok || data.error) {
-      appendChatMsg('bot', '⚠ ' + (data.error || 'Something went wrong. Please try again.'));
+      appendChatMsg('bot', '⚠ ' + (data.error || 'Something went wrong. Please try again.') + (data.details ? '\n' + data.details : ''));
     } else {
       appendChatMsg('bot', data.reply);
       chatHistory.push({ role: 'assistant', content: data.reply });
