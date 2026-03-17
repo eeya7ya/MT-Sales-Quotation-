@@ -195,19 +195,19 @@ function buildFullMeta(date) {
     ['Att.',    info.att      || ''],
     ['Phone',   info.phone    || '']
   ].filter(([,v]) => v)
-   .map(([l,v]) => `<div class="meta-row"><span class="meta-label">${l}:</span><span class="meta-value ${l==='Project'||l==='Client'?'bold':''}">${escHtml(v)}</span></div>`)
+   .map(([l,v]) => `<div class="meta-row"><span class="meta-label">${l}:</span><span class="meta-value bold">${escHtml(v)}</span></div>`)
    .join('');
 
   const right = [
-    ['Ref.',                    info.ref      || ''],
-    ['Presales Engineer',       info.prepared || ''],
-    ['Presales Engineer Phone', info.prepphone|| ''],
-    ['Sales Engineer',          info.saleseng || '']
+    ['Ref.',              info.ref      || ''],
+    ['Presales Engineer', info.prepared || ''],
+    ['Phone',             info.prepphone|| ''],
+    ['Sales Engineer',    info.saleseng || '']
   ].filter(([,v]) => v)
    .map(([l,v]) => `<div class="meta-row"><span class="meta-label">${l}:</span><span class="meta-value bold">${escHtml(v)}</span></div>`)
    .join('');
 
-  return `<div class="meta-section"><div class="meta-col">${left}</div><div class="meta-col">${right}</div></div>`;
+  return `<div class="meta-section"><div class="meta-col">${left}</div><div class="meta-col meta-col-right">${right}</div></div>`;
 }
 
 function buildCompactMeta(date) {
@@ -224,7 +224,8 @@ function buildLogoHTML() {
   if (logoData) {
     return `<img src="${logoData}" class="company-logo" alt="Company Logo">`;
   }
-  return `<div class="company-logo-placeholder">🏢</div>`;
+  // Fall back to the server-hosted logo
+  return `<img src="/logo" class="company-logo" alt="MT Technology Logo" onerror="this.parentElement.innerHTML='<div class=\\'company-logo-placeholder\\'>🏢</div>'">`;
 }
 
 function uploadLogo(input) {

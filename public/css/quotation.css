@@ -151,16 +151,20 @@ body {
   padding: 20px 32px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 0 40px;
   border-bottom: 1px solid var(--border);
   background: #fafbfc;
 }
 
 .meta-col { }
+.meta-col-right {
+  border-left: 1px solid var(--border);
+  padding-left: 32px;
+}
 .meta-row {
   display: flex;
-  gap: 6px;
-  padding: 4px 0;
+  gap: 8px;
+  padding: 5px 0;
   font-size: 13px;
   align-items: baseline;
 }
@@ -168,10 +172,11 @@ body {
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
-  min-width: 120px;
+  min-width: 130px;
   font-size: 12px;
+  flex-shrink: 0;
 }
-.meta-value { color: var(--text-sub); }
+.meta-value { color: var(--text-sub); font-weight: 700; color: var(--text); }
 .meta-value.bold { font-weight: 700; color: var(--text); }
 
 /* ── Items table ─────────────────────────────────────────────── */

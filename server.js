@@ -653,6 +653,18 @@ app.get('/',          (req, res) => res.sendFile(path.join(__dirname, 'public', 
 app.get('/admin',     (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/quotation', (req, res) => res.sendFile(path.join(__dirname, 'public', 'quotation.html')));
 
+// ─── Company Logo ──────────────────────────────────────────────
+app.get('/logo', (req, res) => {
+  const candidates = [
+    path.join(__dirname, 'public', 'logo.png'),
+    path.join(__dirname, 'Magic Tech Logo.png')
+  ];
+  for (const f of candidates) {
+    if (fs.existsSync(f)) return res.sendFile(f);
+  }
+  res.status(404).send('Logo not found');
+});
+
 app.get('/template', (req, res) => {
   const tpl = path.join(__dirname, 'data', 'product_template.xlsx');
   if (fs.existsSync(tpl)) {
