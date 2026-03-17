@@ -729,13 +729,14 @@ Be concise, professional, and helpful. Answer in the same language as the user.$
 
     const groqRes = await httpsPost(
       'https://api.groq.com/openai/v1/chat/completions',
-      { model: 'llama-3.1-70b-versatile', messages: groqMessages, max_tokens: 1024, temperature: 0.7 },
+      { model: 'llama3-70b-8192', messages: groqMessages, max_tokens: 1024, temperature: 0.7 },
       { 'Authorization': `Bearer ${GROQ_KEY}` }
     );
 
     if (groqRes.status !== 200) {
-      console.error('Groq error:', groqRes.body);
-      return res.status(502).json({ error: 'AI service error', details: groqRes.body?.error?.message });
+      const detail = groqRes.body?.error?.message || JSON.stringify(groqRes.body);
+      console.error('Groq error:', groqRes.status, detail);
+      return res.status(502).json({ error: `Groq API error (${groqRes.status}): ${detail}` });
     }
 
     const reply = groqRes.body?.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
