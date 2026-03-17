@@ -128,7 +128,7 @@ function renderQuotation() {
       tableRows += `
         <tr class="subtotal-row">
           <td colspan="6" class="total-label" style="font-size:12px;">Subtotal — ${escHtml(system)}:</td>
-          <td colspan="2" class="total-value" style="font-size:13px;">${fmt(subtotal)}</td>
+          <td colspan="2" class="total-value" style="font-size:13px;text-align:center;">${fmt(subtotal)}</td>
         </tr>
         <tr class="total-row">
           <td colspan="6" class="total-label">Total Material Cost:</td>
@@ -139,7 +139,7 @@ function renderQuotation() {
       tableRows += `
         <tr class="subtotal-row">
           <td colspan="6" class="total-label" style="font-size:12px;">Subtotal — ${escHtml(system)}:</td>
-          <td colspan="2" class="total-value" style="font-size:13px;">${fmt(subtotal)}</td>
+          <td colspan="2" class="total-value" style="font-size:13px;text-align:center;">${fmt(subtotal)}</td>
         </tr>`;
     }
 
@@ -274,7 +274,7 @@ function exportPDF() {
     image:       { type: 'jpeg', quality: 0.96 },
     html2canvas: { scale: 2, useCORS: true, logging: false },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:   { mode: ['css', 'legacy'], before: '.q-page:not(:first-child)' }
+    pagebreak:   { mode: ['css', 'legacy'], after: '.q-page:not(.q-last-page)' }
   };
 
   showToast('Generating PDF…', 'info');
