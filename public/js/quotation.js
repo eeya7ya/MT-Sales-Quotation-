@@ -199,10 +199,11 @@ function buildFullMeta(date) {
    .join('');
 
   const right = [
-    ['Ref.',              info.ref      || ''],
-    ['Presales Engineer', info.prepared || ''],
-    ['Phone',             info.prepphone|| ''],
-    ['Sales Engineer',    info.saleseng || '']
+    ['Ref.',              info.ref        || ''],
+    ['Presales Engineer', info.prepared   || ''],
+    ['Phone',             info.prepphone  || ''],
+    ['Sales Engineer',    info.saleseng   || ''],
+    ['Sales Phone',       info.salesnumber|| '']
   ].filter(([,v]) => v)
    .map(([l,v]) => `<div class="meta-row"><span class="meta-label">${l}:</span><span class="meta-value bold">${escHtml(v)}</span></div>`)
    .join('');

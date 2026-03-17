@@ -603,7 +603,8 @@ function saveCustomerInfo() {
     date:     document.getElementById('fi-date').value,
     prepared: document.getElementById('fi-prepared').value,
     prepphone:document.getElementById('fi-prepphone').value,
-    saleseng: document.getElementById('fi-saleseng').value,
+    saleseng:    document.getElementById('fi-saleseng').value,
+    salesnumber: document.getElementById('fi-salesnumber').value,
     currency: document.getElementById('fi-currency').value,
     notes:    document.getElementById('fi-notes').value
   };
@@ -621,7 +622,8 @@ function loadCustomerInfo() {
     if (info.date)     document.getElementById('fi-date').value      = info.date;
     if (info.prepared) document.getElementById('fi-prepared').value  = info.prepared;
     if (info.prepphone)document.getElementById('fi-prepphone').value = info.prepphone;
-    if (info.saleseng) document.getElementById('fi-saleseng').value  = info.saleseng;
+    if (info.saleseng)    document.getElementById('fi-saleseng').value    = info.saleseng;
+    if (info.salesnumber) document.getElementById('fi-salesnumber').value = info.salesnumber;
     if (info.currency) document.getElementById('fi-currency').value  = info.currency;
     if (info.notes)    document.getElementById('fi-notes').value     = info.notes;
   } catch (_) {}
