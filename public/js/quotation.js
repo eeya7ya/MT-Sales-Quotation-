@@ -69,13 +69,9 @@ function renderQuotation() {
           <div id="logoWrap${pageIndex}">${buildLogoHTML()}</div>
           <div class="logo-overlay">Click to change logo</div>
         </label>
-        <div style="flex:1;text-align:center;">
-          <div style="font-size:22px;font-weight:800;letter-spacing:.3px;">MT Technology Solutions</div>
-          <div style="font-size:12px;opacity:.8;margin-top:3px;">Security · Networking · Audio Systems</div>
-        </div>
         <div class="company-info">
-          <div class="doc-title">Sales Quotation</div>
-          <div style="font-size:11px;opacity:.7;margin-top:5px;">${escHtml(date)}</div>
+          <div class="doc-title">SALES QUOTATION</div>
+          <div class="doc-date">${escHtml(date)}</div>
         </div>
       </div>`;
 
@@ -150,16 +146,26 @@ function renderQuotation() {
     page.innerHTML += `
       <div class="items-section">
         <table class="items-table" id="itemsTable">
+          <colgroup>
+            <col class="col-num">
+            <col class="col-brand">
+            <col class="col-pic">
+            <col class="col-model">
+            <col class="col-desc">
+            <col class="col-qty">
+            <col class="col-price">
+            <col class="col-total">
+          </colgroup>
           <thead>
             <tr>
-              <th class="center" style="width:36px;">#</th>
-              <th style="width:70px;">Brand</th>
-              <th style="width:56px;">Picture</th>
-              <th style="width:130px;">Model</th>
+              <th class="center">#</th>
+              <th>Brand</th>
+              <th class="center">Picture</th>
+              <th>Model</th>
               <th>Description</th>
-              <th class="center" style="width:50px;">Qty</th>
-              <th class="right" style="width:90px;">Unit Price</th>
-              <th class="right" style="width:100px;">Total Price</th>
+              <th class="center">Qty</th>
+              <th class="right">Unit Price</th>
+              <th class="right">Total Price</th>
             </tr>
           </thead>
           <tbody>${tableRows}</tbody>
