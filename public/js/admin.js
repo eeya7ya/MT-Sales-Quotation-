@@ -292,6 +292,32 @@ function goPage(p) {
   renderPagination();
 }
 
+// ─── Image upload for product modal ───────────────────────────
+let currentImageData = null;
+
+function handleProductImageUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return; }
+  if (file.size > 2 * 1024 * 1024) { showToast('Image too large – max 2MB', 'error'); return; }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    currentImageData = e.target.result;
+    document.getElementById('f-image-thumb').src = currentImageData;
+    document.getElementById('f-image-preview').style.display = '';
+    document.getElementById('f-image-none').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearProductImage() {
+  currentImageData = null;
+  document.getElementById('f-image-input').value = '';
+  document.getElementById('f-image-preview').style.display = 'none';
+  document.getElementById('f-image-none').style.display = '';
+}
+
 // ─── Add / Edit Product Modal ──────────────────────────────────
 function openAddModal() {
   editingId = null;
@@ -323,6 +349,7 @@ function clearForm() {
   document.getElementById('f-dpp').value = '';
   document.getElementById('f-si').value  = '';
   document.getElementById('f-eu').value  = '';
+  clearProductImage();
 }
 
 function fillForm(p) {
@@ -337,6 +364,15 @@ function fillForm(p) {
   document.getElementById('f-dpp').value            = p.dpp_price     || '';
   document.getElementById('f-si').value             = p.si_price      || '';
   document.getElementById('f-eu').value             = p.enduser_price || '';
+  // Load existing image
+  if (p.image_data) {
+    currentImageData = p.image_data;
+    document.getElementById('f-image-thumb').src = p.image_data;
+    document.getElementById('f-image-preview').style.display = '';
+    document.getElementById('f-image-none').style.display = 'none';
+  } else {
+    clearProductImage();
+  }
 }
 
 async function saveProduct() {
@@ -354,7 +390,8 @@ async function saveProduct() {
     specifications: document.getElementById('f-specifications').value.trim(),
     dpp_price:      parseFloat(document.getElementById('f-dpp').value) || 0,
     si_price:       parseFloat(document.getElementById('f-si').value)  || 0,
-    enduser_price:  parseFloat(document.getElementById('f-eu').value)  || 0
+    enduser_price:  parseFloat(document.getElementById('f-eu').value)  || 0,
+    image_data:     currentImageData || null
   };
 
   const btn = document.getElementById('saveProductBtn');

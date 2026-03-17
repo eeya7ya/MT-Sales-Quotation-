@@ -69,9 +69,14 @@ async function initDB() {
         dpp_price     NUMERIC(12,3) DEFAULT 0,
         si_price      NUMERIC(12,3) DEFAULT 0,
         enduser_price NUMERIC(12,3) DEFAULT 0,
+        image_data    TEXT,
         created_at    TIMESTAMP DEFAULT NOW(),
         updated_at    TIMESTAMP DEFAULT NOW()
       )
+    `);
+    // Add image_data column if upgrading from older schema
+    await pool.query(`
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS image_data TEXT
     `);
     const { rows } = await pool.query('SELECT COUNT(*) FROM products');
     const count = parseInt(rows[0].count);
@@ -103,16 +108,17 @@ async function dbInsertBulk(products) {
     const vals = [], params = [];
     let n = 1;
     for (const p of chunk) {
-      vals.push(`($${n},$${n+1},$${n+2},$${n+3},$${n+4},$${n+5},$${n+6},$${n+7},$${n+8},$${n+9},$${n+10})`);
-      n += 11;
+      vals.push(`($${n},$${n+1},$${n+2},$${n+3},$${n+4},$${n+5},$${n+6},$${n+7},$${n+8},$${n+9},$${n+10},$${n+11})`);
+      n += 12;
       params.push(
         p.category||'General', p.system||'', p.brand||'', p.type||'', p.series||'',
         p.model||'', p.description||'', p.specifications||'',
-        +p.dpp_price||0, +p.si_price||0, +p.enduser_price||0
+        +p.dpp_price||0, +p.si_price||0, +p.enduser_price||0,
+        p.image_data||null
       );
     }
     await pool.query(
-      `INSERT INTO products (category,system,brand,type,series,model,description,specifications,dpp_price,si_price,enduser_price) VALUES ${vals.join(',')}`,
+      `INSERT INTO products (category,system,brand,type,series,model,description,specifications,dpp_price,si_price,enduser_price,image_data) VALUES ${vals.join(',')}`,
       params
     );
   }
@@ -235,11 +241,12 @@ app.post('/api/products', adminAuth, async (req, res) => {
   try {
     if (useDB && pool) {
       const { rows } = await pool.query(
-        `INSERT INTO products (category,system,brand,type,series,model,description,specifications,dpp_price,si_price,enduser_price)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+        `INSERT INTO products (category,system,brand,type,series,model,description,specifications,dpp_price,si_price,enduser_price,image_data)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
         [p.category||'General', p.system||'', p.brand||'', p.type||'', p.series||'',
          p.model, p.description||'', p.specifications||'',
-         +p.dpp_price||0, +p.si_price||0, +p.enduser_price||0]
+         +p.dpp_price||0, +p.si_price||0, +p.enduser_price||0,
+         p.image_data||null]
       );
       await loadProducts();
       res.json({ success: true, product: rows[0] });
@@ -249,7 +256,8 @@ app.post('/api/products', adminAuth, async (req, res) => {
         category: p.category||'General', system: p.system||'', brand: p.brand||'',
         type: p.type||'', series: p.series||'', model: p.model,
         description: p.description||'', specifications: p.specifications||'',
-        dpp_price: +p.dpp_price||0, si_price: +p.si_price||0, enduser_price: +p.enduser_price||0
+        dpp_price: +p.dpp_price||0, si_price: +p.si_price||0, enduser_price: +p.enduser_price||0,
+        image_data: p.image_data||null
       };
       productsCache.push(np);
       saveJSON();
@@ -267,10 +275,11 @@ app.put('/api/products/:id', adminAuth, async (req, res) => {
       const { rows, rowCount } = await pool.query(
         `UPDATE products SET category=$1,system=$2,brand=$3,type=$4,series=$5,model=$6,
          description=$7,specifications=$8,dpp_price=$9,si_price=$10,enduser_price=$11,
-         updated_at=NOW() WHERE id=$12 RETURNING *`,
+         image_data=$12,updated_at=NOW() WHERE id=$13 RETURNING *`,
         [p.category||'General', p.system||'', p.brand||'', p.type||'', p.series||'',
          p.model, p.description||'', p.specifications||'',
-         +p.dpp_price||0, +p.si_price||0, +p.enduser_price||0, id]
+         +p.dpp_price||0, +p.si_price||0, +p.enduser_price||0,
+         p.image_data||null, id]
       );
       if (!rowCount) return res.status(404).json({ error: 'Product not found' });
       await loadProducts();
@@ -282,7 +291,8 @@ app.put('/api/products/:id', adminAuth, async (req, res) => {
         category: p.category||'General', system: p.system||'', brand: p.brand||'',
         type: p.type||'', series: p.series||'', model: p.model,
         description: p.description||'', specifications: p.specifications||'',
-        dpp_price: +p.dpp_price||0, si_price: +p.si_price||0, enduser_price: +p.enduser_price||0
+        dpp_price: +p.dpp_price||0, si_price: +p.si_price||0, enduser_price: +p.enduser_price||0,
+        image_data: p.image_data||null
       });
       saveJSON();
       res.json({ success: true, product: productsCache[idx] });
