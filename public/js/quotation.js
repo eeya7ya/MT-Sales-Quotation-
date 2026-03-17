@@ -117,29 +117,27 @@ function renderQuotation() {
 
     // Subtotal row for this system (or grand total on last page)
     if (isLast && systems.length === 1) {
-      // Single system: show as "Total Material Cost"
+      // Single system: show as "Total Material Cost" — centered across full row
       tableRows += `
         <tr class="total-row">
-          <td colspan="6" class="total-label">Total Material Cost:</td>
-          <td colspan="2" class="total-value">${fmt(grandTotal)}</td>
+          <td colspan="8" class="total-value total-center">TOTAL MATERIAL COST:&nbsp;&nbsp;${fmt(grandTotal)}</td>
         </tr>`;
     } else if (isLast) {
       // Last page with multiple systems: show subtotal + grand total
       tableRows += `
         <tr class="subtotal-row">
-          <td colspan="6" class="total-label" style="font-size:12px;">Subtotal — ${escHtml(system)}:</td>
-          <td colspan="2" class="total-value" style="font-size:13px;text-align:center;">${fmt(subtotal)}</td>
+          <td colspan="5" class="total-label" style="font-size:12px;">Subtotal — ${escHtml(system)}:</td>
+          <td colspan="3" class="total-value" style="font-size:13px;text-align:center;">${fmt(subtotal)}</td>
         </tr>
         <tr class="total-row">
-          <td colspan="6" class="total-label">Total Material Cost:</td>
-          <td colspan="2" class="total-value">${fmt(grandTotal)}</td>
+          <td colspan="8" class="total-value total-center">TOTAL MATERIAL COST:&nbsp;&nbsp;${fmt(grandTotal)}</td>
         </tr>`;
     } else {
       // Not last page: show subtotal only
       tableRows += `
         <tr class="subtotal-row">
-          <td colspan="6" class="total-label" style="font-size:12px;">Subtotal — ${escHtml(system)}:</td>
-          <td colspan="2" class="total-value" style="font-size:13px;text-align:center;">${fmt(subtotal)}</td>
+          <td colspan="5" class="total-label" style="font-size:12px;">Subtotal — ${escHtml(system)}:</td>
+          <td colspan="3" class="total-value" style="font-size:13px;text-align:center;">${fmt(subtotal)}</td>
         </tr>`;
     }
 

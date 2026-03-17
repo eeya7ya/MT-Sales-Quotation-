@@ -672,6 +672,36 @@
 <!-- Toast container -->
 <div id="toast-container"></div>
 
+<!-- ═══════ AI CHATBOT ═══════════════════════════════════════ -->
+<!-- Floating toggle button -->
+<button id="chatToggleBtn" onclick="toggleChat()" title="AI Assistant" aria-label="Open AI Assistant">
+  <span id="chatBtnIcon">💬</span>
+</button>
+
+<!-- Chat panel -->
+<div id="chatPanel" class="chat-panel" style="display:none;">
+  <div class="chat-header">
+    <div style="display:flex;align-items:center;gap:9px;">
+      <span style="font-size:18px;">🤖</span>
+      <div>
+        <div style="font-weight:700;font-size:13.5px;">AI Sales Assistant</div>
+        <div style="font-size:11px;opacity:.75;">Powered by Groq + Tavily</div>
+      </div>
+    </div>
+    <button onclick="toggleChat()" class="chat-close-btn" aria-label="Close chat">✕</button>
+  </div>
+  <div id="chatMessages" class="chat-messages">
+    <div class="chat-msg chat-msg-bot">
+      <div class="chat-bubble">Hi! I'm your AI Sales Assistant. I can help with product selection, pricing guidance, technical specs, and quotation advice. How can I help you?</div>
+    </div>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" class="chat-input" placeholder="Ask me anything…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}">
+    <button id="chatSendBtn" onclick="sendChat()" class="chat-send-btn" aria-label="Send message">➤</button>
+  </div>
+</div>
+
 <script src="/js/configurator.js"></script>
+<script src="/js/chatbot.js"></script>
 </body>
 </html>
