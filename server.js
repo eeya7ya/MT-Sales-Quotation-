@@ -692,26 +692,7 @@ app.post('/api/chat', async (req, res) => {
   if (!GROQ_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not configured on server' });
 
   try {
-    // Optional: Tavily web search for queries that need current info
-    let searchContext = '';
-    const needsSearch = TAVILY_KEY && /price|latest|find|search|buy|where|how much|product|spec/i.test(message);
-    if (needsSearch) {
-      try {
-        const tav = await httpsPost(
-          'https://api.tavily.com/search',
-          { api_key: TAVILY_KEY, query: message, search_depth: 'basic', max_results: 3, include_answer: true }
-        );
-        if (tav.body && tav.body.results) {
-          const snippets = tav.body.results
-            .slice(0, 3)
-            .map(r => `• ${r.title}: ${(r.content || '').slice(0, 200)}`)
-            .join('\n');
-          searchContext = `\n\nRelevant web search results:\n${snippets}`;
-        }
-      } catch (e) {
-        console.warn('Tavily search error:', e.message);
-      }
-    }
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Amman' });
 
     const systemPrompt = `You are an AI assistant for MT Technology Solutions — a security and technology solutions company. You help with:
 - Sales quotation guidance and product selection
@@ -719,7 +700,8 @@ app.post('/api/chat', async (req, res) => {
 - Technical specifications and pricing advice
 - Quotation best practices
 
-Be concise, professional, and helpful. Answer in the same language as the user.${searchContext}`;
+Today's date is ${today} (Jordan time).
+Be concise, professional, and helpful. Answer in the same language as the user.`;
 
     const groqMessages = [
       { role: 'system', content: systemPrompt },
@@ -727,9 +709,10 @@ Be concise, professional, and helpful. Answer in the same language as the user.$
       { role: 'user', content: message }
     ];
 
+    // compound-beta has built-in web search — no external search API needed
     const groqRes = await httpsPost(
       'https://api.groq.com/openai/v1/chat/completions',
-      { model: 'llama-3.3-70b-versatile', messages: groqMessages, max_tokens: 1024, temperature: 0.7 },
+      { model: 'compound-beta', messages: groqMessages, max_tokens: 1024, temperature: 0.7 },
       { 'Authorization': `Bearer ${GROQ_KEY}` }
     );
 
